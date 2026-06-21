@@ -277,14 +277,18 @@
   }
   .assign-card h3{ font-size:16px; margin-bottom:4px; }
   .assign-card .composer-sub{ font-size:12.5px; color:var(--ink-faint); margin-bottom:10px; }
-  .assign-row{ display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px dashed var(--paper-line); }
+  .assign-row{ padding:9px 0; border-top:1px dashed var(--paper-line); }
   .assign-row:first-of-type{ border-top:none; }
-  .assign-part-name{ flex:0 0 120px; font-size:13.5px; color:var(--wood); font-weight:600; }
-  .assign-select{
-    flex:1; border:1px solid var(--paper-line); border-radius:8px; padding:7px 9px;
-    font-size:13.5px; background:#fff; color:var(--ink);
+  .assign-part-name{ display:block; font-size:13.5px; color:var(--wood); font-weight:600; margin-bottom:6px; }
+  .member-chip-group{ display:flex; flex-wrap:wrap; gap:6px; }
+  .member-chip{
+    display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+    border:1px solid var(--paper-line); background:#fff; color:var(--ink-soft);
+    border-radius:999px; padding:5px 11px 5px 8px; font-size:12.5px; user-select:none;
+    transition:all .12s ease;
   }
-  .assign-select.unassigned{ color:var(--ink-faint); }
+  .member-chip input{ accent-color:var(--wood-dark); margin:0; }
+  .member-chip.checked{ background:var(--status-done-bg); border-color:var(--status-done); color:var(--status-done); font-weight:700; }
   .assign-no-parts{ font-size:13px; color:var(--ink-faint); }
 
   /* ---------- rehearsals ---------- */
@@ -362,6 +366,8 @@
   .field{ display:flex; flex-direction:column; gap:5px; }
   .field label{ font-size:12.5px; font-weight:700; color:var(--wood); }
   .field .hint{ font-size:11.5px; color:var(--ink-faint); font-weight:400; }
+  .field > .hint{ display:block; margin-top:2px; }
+  .field .hint.warn{ color:var(--status-practice); font-weight:600; }
   .field input[type=text], .field input[type=url], .field input[type=tel],
   .field input[type=date], .field input[type=time], .field select, .field textarea{
     border:1px solid var(--paper-line); border-radius:9px; padding:10px 12px;
@@ -664,15 +670,10 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="rehearsalId">
-        <div class="field-row">
-          <div class="field">
-            <label for="rehearsalDate">날짜 *</label>
-            <input type="date" id="rehearsalDate" required>
-          </div>
-          <div class="field">
-            <label for="rehearsalTime">시간</label>
-            <input type="time" id="rehearsalTime">
-          </div>
+        <div class="field">
+          <label for="rehearsalDate">날짜 *</label>
+          <input type="date" id="rehearsalDate" required>
+          <span class="hint" id="dateHint">연습 시간은 매주 목요일 저녁 8:10으로 고정되어 있습니다.</span>
         </div>
         <div class="field">
           <label for="rehearsalLocation">장소</label>
@@ -742,6 +743,12 @@
     return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   }
 
+  function nextThursday(fromIso){
+    var d = new Date(fromIso + "T00:00:00");
+    var diff = (4 - d.getDay() + 7) % 7; // Thursday = 4
+    return addDays(fromIso, diff);
+  }
+
   var DOW = ["일","월","화","수","목","금","토"];
   function formatDateFull(iso){
     if(!iso) return "";
@@ -750,26 +757,26 @@
   }
 
   function seedSampleData(){
-    var nextSunday = addDays(todayISO(), (7 - new Date().getDay()) % 7 || 7);
+    var nextRehearsalDate = nextThursday(todayISO());
     var s1 = uid(), s2 = uid(), s3 = uid();
     var mConductor = uid(), m1st = uid(), m2nd = uid(), mBass = uid();
     state.scores = [
       {
         id:s1, title:"사랑의 로망스 (Romance Anónimo)", composer:"Anonymous (스페인 민요)",
         arranger:"교본 편곡", difficulty:"초급", status:"완성", scoreLink:"",
-        parts:[{name:"1st Guitar",link:"",memberId:m1st},{name:"2nd Guitar",link:"",memberId:m2nd},{name:"Bass Guitar",link:"",memberId:mBass}],
+        parts:[{name:"1st Guitar",link:"",memberIds:[m1st]},{name:"2nd Guitar",link:"",memberIds:[m2nd]},{name:"Bass Guitar",link:"",memberIds:[mBass]}],
         memo:"기초 합주곡. 멜로디 라인 반복 연습이 필요합니다.", addedDate: todayISO(), sample:true
       },
       {
         id:s2, title:"카논 변주 (Canon Variations)", composer:"J. Pachelbel",
         arranger:"앙상블 편곡", difficulty:"중급", status:"연습중", scoreLink:"",
-        parts:[{name:"1st Guitar",link:"",memberId:m1st},{name:"2nd Guitar",link:"",memberId:""},{name:"3rd Guitar",link:"",memberId:""},{name:"Bass Guitar",link:"",memberId:mBass}],
+        parts:[{name:"1st Guitar",link:"",memberIds:[m1st,m2nd]},{name:"2nd Guitar",link:"",memberIds:[]},{name:"3rd Guitar",link:"",memberIds:[]},{name:"Bass Guitar",link:"",memberIds:[mBass]}],
         memo:"후반부 변주 파트 박자에 주의하세요.", addedDate: todayISO(), sample:true
       },
       {
         id:s3, title:"엘리제를 위하여 (기타 합주판)", composer:"L. v. Beethoven",
         arranger:"", difficulty:"중급", status:"검토중", scoreLink:"",
-        parts:[{name:"1st Guitar",link:"",memberId:""},{name:"2nd Guitar",link:"",memberId:""}],
+        parts:[{name:"1st Guitar",link:"",memberIds:[]},{name:"2nd Guitar",link:"",memberIds:[]}],
         memo:"편곡 검토 중. 다음 모임에서 채택 여부를 결정합니다.", addedDate: todayISO(), sample:true
       }
     ];
@@ -780,10 +787,26 @@
       { id:mBass, name:"최OO", part:"Bass Guitar", phone:"", joinDate:"", memo:"", sample:true }
     ];
     state.rehearsals = [
-      { id:uid(), date:nextSunday, time:"14:00", location:"교하성당 교육관",
+      { id:uid(), date:nextRehearsalDate, time:FIXED_REHEARSAL_TIME, location:"교하성당 교육관",
         pieceIds:[s1,s2], memo:"전체 합주 위주로 연습합니다.", sample:true }
     ];
     state.sample = true;
+  }
+
+  var FIXED_REHEARSAL_TIME = "20:10";
+
+  function migrateData(){
+    // older builds stored a single part.memberId; convert to memberIds array
+    state.scores.forEach(function(s){
+      (s.parts||[]).forEach(function(p){
+        if(!Array.isArray(p.memberIds)){
+          p.memberIds = p.memberId ? [p.memberId] : [];
+        }
+        delete p.memberId;
+      });
+    });
+    // rehearsal time is now fixed every week
+    state.rehearsals.forEach(function(r){ r.time = FIXED_REHEARSAL_TIME; });
   }
 
   function loadState(){
@@ -795,6 +818,8 @@
         state.members = parsed.members || [];
         state.rehearsals = parsed.rehearsals || [];
         state.sample = !!parsed.sample;
+        migrateData();
+        saveState();
       } else {
         seedSampleData();
         saveState();
@@ -901,12 +926,15 @@
   function scoreCardHtml(s){
     var partsHtml = (s.parts||[]).map(function(p){
       if(!p.name) return "";
-      var member = p.memberId ? state.members.find(function(m){ return m.id === p.memberId; }) : null;
-      var label = escapeHtml(p.name) + (member ? ' · '+escapeHtml(member.name) : '');
+      var memberNames = (p.memberIds||[]).map(function(id){
+        var m = state.members.find(function(x){ return x.id === id; });
+        return m ? m.name : null;
+      }).filter(Boolean);
+      var label = escapeHtml(p.name) + (memberNames.length ? ' · '+memberNames.map(escapeHtml).join(", ") : '');
       if(p.link){
         return '<span class="part-pill linked"><a href="'+escapeHtml(p.link)+'" target="_blank" rel="noopener">'+label+' ↗</a></span>';
       }
-      return '<span class="part-pill'+(member?' linked':'')+'">'+label+'</span>';
+      return '<span class="part-pill'+(memberNames.length?' linked':'')+'">'+label+'</span>';
     }).join("");
 
     var scoreLinkHtml = s.scoreLink
@@ -1030,12 +1058,12 @@
     var parts = Array.prototype.map.call(document.querySelectorAll("#partRows .part-row"), function(row){
       var name = row.querySelector(".pname").value.trim();
       var link = row.querySelector(".plink").value.trim();
-      var memberId = "";
+      var memberIds = [];
       if(existingScore){
         var prevMatch = (existingScore.parts||[]).find(function(p){ return p.name === name; });
-        if(prevMatch) memberId = prevMatch.memberId || "";
+        if(prevMatch) memberIds = (prevMatch.memberIds || []).slice();
       }
-      return { name: name, link: link, memberId: memberId };
+      return { name: name, link: link, memberIds: memberIds };
     }).filter(function(p){ return p.name; });
 
     var data = {
@@ -1122,7 +1150,9 @@
         var removedId = delId.dataset.delMember;
         state.members = state.members.filter(function(x){ return x.id !== removedId; });
         state.scores.forEach(function(s){
-          (s.parts||[]).forEach(function(p){ if(p.memberId === removedId) p.memberId = ""; });
+          (s.parts||[]).forEach(function(p){
+            if(p.memberIds) p.memberIds = p.memberIds.filter(function(mid){ return mid !== removedId; });
+          });
         });
         saveState(); renderMembers(); renderStats(); renderScores(); renderPartAssign();
       });
@@ -1172,13 +1202,22 @@
      파트 배정
   ============================================================ */
   function assignRowHtml(score, part, idx){
-    var options = '<option value="">미배정</option>' + state.members.map(function(m){
-      var label = m.name + (m.part ? ' ('+m.part+')' : '');
-      return '<option value="'+m.id+'"'+(part.memberId===m.id?' selected':'')+'>'+escapeHtml(label)+'</option>';
-    }).join("");
+    var ids = part.memberIds || [];
+    var chips;
+    if(state.members.length === 0){
+      chips = '<span class="assign-no-parts">등록된 단원이 없습니다.</span>';
+    } else {
+      chips = state.members.map(function(m){
+        var checked = ids.indexOf(m.id) > -1;
+        return '<label class="member-chip'+(checked?' checked':'')+'">'+
+          '<input type="checkbox" value="'+m.id+'" data-score="'+score.id+'" data-idx="'+idx+'"'+(checked?' checked':'')+'>'+
+          escapeHtml(m.name)+
+        '</label>';
+      }).join("");
+    }
     return '<div class="assign-row">'+
       '<span class="assign-part-name">'+escapeHtml(part.name)+'</span>'+
-      '<select class="assign-select'+(part.memberId?'':' unassigned')+'" data-score="'+score.id+'" data-idx="'+idx+'">'+options+'</select>'+
+      '<div class="member-chip-group">'+chips+'</div>'+
     '</div>';
   }
 
@@ -1208,13 +1247,19 @@
   }
 
   document.getElementById("partAssignList").addEventListener("change", function(e){
-    if(!e.target.classList.contains("assign-select")) return;
+    if(e.target.type !== "checkbox") return;
     var scoreId = e.target.dataset.score;
     var idx = parseInt(e.target.dataset.idx, 10);
     var s = state.scores.find(function(x){ return x.id === scoreId; });
     if(s && s.parts && s.parts[idx]){
-      s.parts[idx].memberId = e.target.value;
-      e.target.classList.toggle("unassigned", !e.target.value);
+      var ids = s.parts[idx].memberIds || [];
+      if(e.target.checked){
+        if(ids.indexOf(e.target.value) === -1) ids.push(e.target.value);
+      } else {
+        ids = ids.filter(function(id){ return id !== e.target.value; });
+      }
+      s.parts[idx].memberIds = ids;
+      e.target.closest(".member-chip").classList.toggle("checked", e.target.checked);
       saveState();
       renderScores();
     }
@@ -1320,14 +1365,28 @@
     var r = id ? state.rehearsals.find(function(x){ return x.id === id; }) : null;
     document.getElementById("rehearsalModalTitle").textContent = r ? "연습 일정 수정" : "연습 일정 추가";
     document.getElementById("rehearsalId").value = r ? r.id : "";
-    document.getElementById("rehearsalDate").value = r ? r.date : todayISO();
-    document.getElementById("rehearsalTime").value = r ? r.time||"" : "";
+    document.getElementById("rehearsalDate").value = r ? r.date : nextThursday(todayISO());
     document.getElementById("rehearsalLocation").value = r ? r.location||"" : "";
     document.getElementById("rehearsalMemo").value = r ? r.memo||"" : "";
     renderPieceCheckboxes(r ? r.pieceIds : []);
+    updateDateHint();
     openModal("rehearsalModalOverlay");
     document.getElementById("rehearsalDate").focus();
   }
+  function updateDateHint(){
+    var val = document.getElementById("rehearsalDate").value;
+    var hintEl = document.getElementById("dateHint");
+    if(!val){ hintEl.textContent = "연습 시간은 매주 목요일 저녁 8:10으로 고정되어 있습니다."; hintEl.classList.remove("warn"); return; }
+    var d = new Date(val + "T00:00:00");
+    if(d.getDay() === 4){
+      hintEl.textContent = "목요일 저녁 8:10 — 정기 연습일입니다.";
+      hintEl.classList.remove("warn");
+    } else {
+      hintEl.textContent = "목요일이 아닙니다. 보강·특별 연습이라면 그대로 진행해도 괜찮아요. (시간은 저녁 8:10으로 고정)";
+      hintEl.classList.add("warn");
+    }
+  }
+  document.getElementById("rehearsalDate").addEventListener("input", updateDateHint);
   document.getElementById("addRehearsalBtn").addEventListener("click", function(){ openRehearsalModal(null); });
 
   document.getElementById("rehearsalForm").addEventListener("submit", function(e){
@@ -1339,7 +1398,7 @@
     );
     var data = {
       date: document.getElementById("rehearsalDate").value,
-      time: document.getElementById("rehearsalTime").value,
+      time: FIXED_REHEARSAL_TIME,
       location: document.getElementById("rehearsalLocation").value.trim(),
       pieceIds: pieceIds,
       memo: document.getElementById("rehearsalMemo").value.trim()
