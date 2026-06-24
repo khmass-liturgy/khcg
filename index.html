@@ -631,7 +631,7 @@
           <label for="scoreLink">총보(전체 악보) 링크 <span class="hint">선택 사항 — 구글드라이브 등 PDF 링크</span></label>
           <input type="url" id="scoreLink" placeholder="https://...">
         </div>
-        <div class="field">
+        <div class="field" id="partSection">
           <label>파트별 악보 <span class="hint">파트명과 (선택) 링크를 입력하세요</span></label>
           <div id="partRows" style="display:flex; flex-direction:column; gap:8px;"></div>
           <button type="button" class="btn-text add-part-btn" id="addPartRowBtn">+ 파트 추가</button>
@@ -1207,11 +1207,37 @@
     document.getElementById("scoreLink").value = s ? s.scoreLink||"" : "";
     document.getElementById("scoreMemo").value = s ? s.memo||"" : "";
     var rows = document.getElementById("partRows");
-    var parts = s && s.parts && s.parts.length ? s.parts : [{name:"1st Guitar",link:""},{name:"2nd Guitar",link:""}];
-    rows.innerHTML = parts.map(function(p){ return partRowHtml(p.name, p.link); }).join("");
+    var partSection = document.getElementById("partSection");
+    var scoreType = s ? (s.type||"합주") : "합주";
+    var isEnsemble = scoreType === "합주";
+
+    if(isEnsemble){
+      var parts = s && s.parts && s.parts.length ? s.parts : [{name:"1st Guitar",link:""},{name:"2nd Guitar",link:""}];
+      rows.innerHTML = parts.map(function(p){ return partRowHtml(p.name, p.link); }).join("");
+      partSection.style.display = "";
+    } else {
+      // 독주/공지 — 파트 섹션 숨기고 기존 파트 유지(지우지 않음)
+      rows.innerHTML = (s && s.parts||[]).map(function(p){ return partRowHtml(p.name, p.link); }).join("");
+      partSection.style.display = "none";
+    }
     openModal("scoreModalOverlay");
     document.getElementById("scoreTitle").focus();
   }
+
+  // 구분 변경 시 파트 섹션 표시/숨김
+  document.getElementById("scoreType").addEventListener("change", function(){
+    var partSection = document.getElementById("partSection");
+    if(this.value === "합주"){
+      partSection.style.display = "";
+      if(!document.querySelectorAll("#partRows .part-row").length){
+        document.getElementById("partRows").innerHTML =
+          partRowHtml("1st Guitar","") + partRowHtml("2nd Guitar","");
+      }
+    } else {
+      partSection.style.display = "none";
+    }
+  });
+
   document.getElementById("addScoreBtn").addEventListener("click", function(){ openScoreModal(null); });
 
   document.getElementById("scoreForm").addEventListener("submit", function(e){
@@ -1389,7 +1415,7 @@
     var box = document.getElementById("partAssignList");
     var empty = document.getElementById("partAssignEmpty");
 
-    var eligible = state.scores.filter(function(s){ return (s.type||"합주") !== "공지"; });
+    var eligible = state.scores.filter(function(s){ return (s.type||"합주") === "합주"; });
     document.getElementById("assignCount").textContent = "(" + eligible.length + ")";
 
     if(eligible.length === 0){
