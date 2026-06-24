@@ -452,7 +452,7 @@
     <button class="tab-btn active" data-tab="scores">🎼 악보함</button>
     <button class="tab-btn" data-tab="partassign">🎻 파트 배정</button>
     <button class="tab-btn" data-tab="members">👤 단원</button>
-    <button class="tab-btn" data-tab="rehearsals">🗓 연습 일정</button>
+    <button class="tab-btn" data-tab="rehearsals">🗓 연습(수업) 일정</button>
     <button class="tab-btn" data-tab="stats">📊 통계</button>
   </div>
 </nav>
@@ -478,6 +478,11 @@
     </div>
     <div class="toolbar">
       <input class="search-input" id="scoreSearch" type="text" placeholder="제목, 작곡가, 편곡자로 검색…">
+      <div class="chip-group" id="typeChips">
+        <button class="chip active" data-type="all">전체</button>
+        <button class="chip" data-type="독주">🎸 독주</button>
+        <button class="chip" data-type="합주">🎶 합주</button>
+      </div>
       <div class="chip-group" id="statusChips">
         <button class="chip active" data-status="all">전체</button>
         <button class="chip" data-status="검토중">검토중</button>
@@ -533,7 +538,7 @@
   <!-- ===================== 연습 일정 ===================== -->
   <section id="tab-rehearsals">
     <div class="section-head">
-      <h2>연습 일정 <span class="count" id="rehearsalCount"></span></h2>
+      <h2>연습(수업) 일정 <span class="count" id="rehearsalCount"></span></h2>
       <button class="btn-primary" id="addRehearsalBtn" type="button">+ 일정 추가</button>
     </div>
     <div id="nextRehearsal"></div>
@@ -541,7 +546,7 @@
     <div id="rehearsalEmpty" class="empty-state" style="display:none;">
       <span class="glyph">🗓</span>
       <p><strong>등록된 연습 일정이 없습니다.</strong></p>
-      <p>다음 합주 연습 일정을 추가해보세요.</p>
+      <p>다음 연습(수업) 일정을 추가해보세요.</p>
     </div>
   </section>
 
@@ -595,6 +600,13 @@
           </div>
         </div>
         <div class="field-row">
+          <div class="field">
+            <label for="scoreType">구분</label>
+            <select id="scoreType">
+              <option value="합주" selected>합주</option>
+              <option value="독주">독주</option>
+            </select>
+          </div>
           <div class="field">
             <label for="scoreDifficulty">난이도</label>
             <select id="scoreDifficulty">
@@ -677,7 +689,7 @@
   <div class="modal">
     <form id="rehearsalForm">
       <div class="modal-head">
-        <h2 id="rehearsalModalTitle">연습 일정 추가</h2>
+        <h2 id="rehearsalModalTitle">연습(수업) 일정 추가</h2>
         <button type="button" class="modal-close" data-close>✕</button>
       </div>
       <div class="modal-body">
@@ -689,7 +701,7 @@
         </div>
         <div class="field">
           <label for="rehearsalLocation">장소</label>
-          <input type="text" id="rehearsalLocation" placeholder="예: 교하성당 교육관">
+          <input type="text" id="rehearsalLocation" placeholder="교하성당 마테오방">
         </div>
         <div class="field">
           <label>연습곡 <span class="hint">이번 연습에서 다룰 곡을 선택하세요</span></label>
@@ -829,19 +841,19 @@
         id:s1, title:"사랑의 로망스 (Romance Anónimo)", composer:"Anonymous (스페인 민요)",
         arranger:"교본 편곡", difficulty:"초급", status:"완성", scoreLink:"",
         parts:[{name:"1st Guitar",link:"",memberIds:[m1st]},{name:"2nd Guitar",link:"",memberIds:[m2nd]},{name:"Bass Guitar",link:"",memberIds:[mBass]}],
-        memo:"기초 합주곡. 멜로디 라인 반복 연습이 필요합니다.", addedDate: todayISO(), sample:true
+        memo:"기초 합주곡. 멜로디 라인 반복 연습이 필요합니다.", addedDate: todayISO(), sample:true, type:"합주"
       },
       {
         id:s2, title:"카논 변주 (Canon Variations)", composer:"J. Pachelbel",
         arranger:"앙상블 편곡", difficulty:"중급", status:"연습중", scoreLink:"",
         parts:[{name:"1st Guitar",link:"",memberIds:[m1st,m2nd]},{name:"2nd Guitar",link:"",memberIds:[]},{name:"3rd Guitar",link:"",memberIds:[]},{name:"Bass Guitar",link:"",memberIds:[mBass]}],
-        memo:"후반부 변주 파트 박자에 주의하세요.", addedDate: todayISO(), sample:true
+        memo:"후반부 변주 파트 박자에 주의하세요.", addedDate: todayISO(), sample:true, type:"합주"
       },
       {
         id:s3, title:"엘리제를 위하여 (기타 합주판)", composer:"L. v. Beethoven",
         arranger:"", difficulty:"중급", status:"검토중", scoreLink:"",
         parts:[{name:"1st Guitar",link:"",memberIds:[]},{name:"2nd Guitar",link:"",memberIds:[]}],
-        memo:"편곡 검토 중. 다음 모임에서 채택 여부를 결정합니다.", addedDate: todayISO(), sample:true
+        memo:"편곡 검토 중. 다음 모임에서 채택 여부를 결정합니다.", addedDate: todayISO(), sample:true, type:"합주"
       }
     ];
     state.members = [
@@ -851,7 +863,7 @@
       { id:mBass, name:"최OO", part:"Bass Guitar", phone:"", joinDate:"", memo:"", sample:true }
     ];
     state.rehearsals = [
-      { id:uid(), date:nextRehearsalDate, time:FIXED_REHEARSAL_TIME, location:"교하성당 교육관",
+      { id:uid(), date:nextRehearsalDate, time:FIXED_REHEARSAL_TIME, location:"교하성당 마테오방",
         pieceIds:[s1,s2], memo:"전체 합주 위주로 연습합니다.", sample:true }
     ];
     state.sample = true;
@@ -1020,8 +1032,16 @@
   /* ============================================================
      악보함
   ============================================================ */
-  var scoreFilters = { status:"all", diff:"all", query:"" };
+  var scoreFilters = { status:"all", diff:"all", type:"all", query:"" };
 
+  document.getElementById("typeChips").addEventListener("click", function(e){
+    var btn = e.target.closest(".chip");
+    if(!btn) return;
+    document.querySelectorAll("#typeChips .chip").forEach(function(c){ c.classList.remove("active"); });
+    btn.classList.add("active");
+    scoreFilters.type = btn.dataset.type;
+    renderScores();
+  });
   document.getElementById("statusChips").addEventListener("click", function(e){
     var btn = e.target.closest(".chip");
     if(!btn) return;
@@ -1064,6 +1084,10 @@
       ? '<a href="'+escapeHtml(s.scoreLink)+'" target="_blank" rel="noopener" class="btn-text" style="padding:0;">총보 보기 ↗</a>'
       : '';
 
+    var typeBadge = (s.type === "독주")
+      ? '<span class="badge" style="background:#E8E0F4;color:#5B3E8A;">🎸 독주</span>'
+      : '<span class="badge" style="background:#DFF0E8;color:#2E6B50;">🎶 합주</span>';
+
     return ''+
     '<div class="score-card" data-id="'+s.id+'">'+
       '<div class="top-row">'+
@@ -1071,7 +1095,10 @@
           '<h3>'+escapeHtml(s.title)+'</h3>'+
           '<div class="composer">'+escapeHtml(s.composer || "작곡가 미상")+(s.arranger? ' · 편곡 '+escapeHtml(s.arranger):'')+'</div>'+
         '</div>'+
-        '<span class="badge badge-diff">'+escapeHtml(s.difficulty||"")+'</span>'+
+        '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'+
+          typeBadge+
+          '<span class="badge badge-diff">'+escapeHtml(s.difficulty||"")+'</span>'+
+        '</div>'+
       '</div>'+
       '<div class="part-pills">'+partsHtml+'</div>'+
       (s.memo ? '<div class="score-memo">'+escapeHtml(s.memo)+'</div>' : '')+
@@ -1093,6 +1120,7 @@
 
   function renderScores(){
     var list = state.scores.slice();
+    if(scoreFilters.type !== "all") list = list.filter(function(s){ return (s.type||"합주") === scoreFilters.type; });
     if(scoreFilters.status !== "all") list = list.filter(function(s){ return s.status === scoreFilters.status; });
     if(scoreFilters.diff !== "all") list = list.filter(function(s){ return s.difficulty === scoreFilters.diff; });
     if(scoreFilters.query){
@@ -1162,6 +1190,7 @@
     document.getElementById("scoreTitle").value = s ? s.title : "";
     document.getElementById("scoreComposer").value = s ? s.composer||"" : "";
     document.getElementById("scoreArranger").value = s ? s.arranger||"" : "";
+    document.getElementById("scoreType").value = s ? (s.type||"합주") : "합주";
     document.getElementById("scoreDifficulty").value = s ? s.difficulty : "중급";
     document.getElementById("scoreStatus").value = s ? s.status : "연습중";
     document.getElementById("scoreLink").value = s ? s.scoreLink||"" : "";
@@ -1193,6 +1222,7 @@
       title: document.getElementById("scoreTitle").value.trim(),
       composer: document.getElementById("scoreComposer").value.trim(),
       arranger: document.getElementById("scoreArranger").value.trim(),
+      type: document.getElementById("scoreType").value,
       difficulty: document.getElementById("scoreDifficulty").value,
       status: document.getElementById("scoreStatus").value,
       scoreLink: document.getElementById("scoreLink").value.trim(),
@@ -1464,7 +1494,7 @@
     var delId = e.target.closest("[data-del-rehearsal]");
     if(editId) openRehearsalModal(editId.dataset.editRehearsal);
     if(delId){
-      askDelete('이 연습 일정을 삭제합니다.', function(){
+      askDelete('이 연습(수업) 일정을 삭제합니다.', function(){
         state.rehearsals = state.rehearsals.filter(function(r){ return r.id !== delId.dataset.delRehearsal; });
         saveState(); renderRehearsals();
       });
@@ -1486,10 +1516,10 @@
 
   function openRehearsalModal(id){
     var r = id ? state.rehearsals.find(function(x){ return x.id === id; }) : null;
-    document.getElementById("rehearsalModalTitle").textContent = r ? "연습 일정 수정" : "연습 일정 추가";
+    document.getElementById("rehearsalModalTitle").textContent = r ? "연습(수업) 일정 수정" : "연습(수업) 일정 추가";
     document.getElementById("rehearsalId").value = r ? r.id : "";
     document.getElementById("rehearsalDate").value = r ? r.date : nextThursday(todayISO());
-    document.getElementById("rehearsalLocation").value = r ? r.location||"" : "";
+    document.getElementById("rehearsalLocation").value = r ? r.location||"" : "교하성당 마테오방";
     document.getElementById("rehearsalMemo").value = r ? r.memo||"" : "";
     renderPieceCheckboxes(r ? r.pieceIds : []);
     updateDateHint();
