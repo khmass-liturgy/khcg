@@ -482,6 +482,7 @@
         <button class="chip active" data-type="all">전체</button>
         <button class="chip" data-type="독주">🎸 독주</button>
         <button class="chip" data-type="합주">🎶 합주</button>
+        <button class="chip" data-type="공지">📢 공지</button>
       </div>
       <div class="chip-group" id="statusChips">
         <button class="chip active" data-status="all">전체</button>
@@ -605,6 +606,7 @@
             <select id="scoreType">
               <option value="합주" selected>합주</option>
               <option value="독주">독주</option>
+              <option value="공지">공지</option>
             </select>
           </div>
           <div class="field">
@@ -704,7 +706,7 @@
           <input type="text" id="rehearsalLocation" placeholder="교하성당 마테오방">
         </div>
         <div class="field">
-          <label>연습곡 <span class="hint">이번 연습에서 다룰 곡을 선택하세요</span></label>
+          <label>연습곡 및 기타 내용 <span class="hint">이번 수업에서 다룰 항목을 선택하세요</span></label>
           <div id="pieceCheckboxes" class="checkbox-list"></div>
         </div>
         <div class="field">
@@ -1086,6 +1088,8 @@
 
     var typeBadge = (s.type === "독주")
       ? '<span class="badge" style="background:#E8E0F4;color:#5B3E8A;">🎸 독주</span>'
+      : (s.type === "공지")
+      ? '<span class="badge" style="background:#FDE8C8;color:#8B4A10;">📢 공지</span>'
       : '<span class="badge" style="background:#DFF0E8;color:#2E6B50;">🎶 합주</span>';
 
     return ''+
@@ -1508,10 +1512,26 @@
       return;
     }
     selectedIds = selectedIds || [];
-    box.innerHTML = state.scores.map(function(s){
+
+    var pieces  = state.scores.filter(function(s){ return (s.type||"합주") !== "공지"; });
+    var notices = state.scores.filter(function(s){ return s.type === "공지"; });
+
+    function makeItem(s){
       var checked = selectedIds.indexOf(s.id) > -1 ? "checked" : "";
       return '<label><input type="checkbox" value="'+s.id+'" '+checked+'> '+escapeHtml(s.title)+'</label>';
-    }).join("");
+    }
+
+    var html = "";
+    if(pieces.length){
+      html += '<div style="font-size:11.5px;font-weight:700;color:var(--wood);margin-bottom:4px;letter-spacing:.04em;">🎶 연습곡</div>';
+      html += pieces.map(makeItem).join("");
+    }
+    if(notices.length){
+      if(pieces.length) html += '<div style="height:1px;background:var(--paper-line);margin:8px 0;"></div>';
+      html += '<div style="font-size:11.5px;font-weight:700;color:var(--wood);margin-bottom:4px;letter-spacing:.04em;">📢 기타 내용</div>';
+      html += notices.map(makeItem).join("");
+    }
+    box.innerHTML = html;
   }
 
   function openRehearsalModal(id){
