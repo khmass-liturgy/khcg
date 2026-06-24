@@ -762,7 +762,8 @@
 </div>
 
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1682,13 +1683,21 @@
   document.getElementById("firebaseModalClose2").addEventListener("click", closeFirebaseModal);
 
   document.getElementById("fbConnectBtn").addEventListener("click", function(){
-    var raw = document.getElementById("fbConfigInput").value.trim();
     var errEl = document.getElementById("fbConfigError");
     errEl.style.display = "none";
+
+    // Firebase SDK 로드 확인
+    if(typeof firebase === "undefined"){
+      errEl.textContent = "Firebase SDK 로드 실패. 인터넷 연결 확인 후 페이지를 새로고침 해주세요.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    var raw = document.getElementById("fbConfigInput").value.trim();
     if(!raw){ errEl.textContent = "설정 값을 입력해주세요."; errEl.style.display = "block"; return; }
+
     var cfg;
     try{
-      // Firebase 콘솔에서 복사한 형태 (const firebaseConfig = {...}) 도 지원
       var jsonStr = raw.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1");
       cfg = JSON.parse(jsonStr);
     }catch(e){
@@ -1697,15 +1706,22 @@
       return;
     }
     if(!cfg.databaseURL){
-      errEl.textContent = "databaseURL이 없습니다. Realtime Database를 활성화했는지 확인해주세요.";
+      errEl.textContent = "databaseURL이 없습니다. Realtime Database URL을 확인해주세요.";
       errEl.style.display = "block";
       return;
     }
-    // 앱이 이미 초기화된 경우 기존 앱 삭제 후 재시작
-    if(firebase.apps.length){
-      firebase.app().delete().then(function(){ db = null; initFirebase(cfg); });
-    } else {
-      initFirebase(cfg);
+
+    try{
+      if(firebase.apps.length){
+        firebase.app().delete().then(function(){ db = null; initFirebase(cfg); }).catch(function(e){
+          errEl.textContent = "오류: " + e.message; errEl.style.display = "block";
+        });
+      } else {
+        initFirebase(cfg);
+      }
+    }catch(e){
+      errEl.textContent = "오류: " + e.message;
+      errEl.style.display = "block";
     }
   });
 
