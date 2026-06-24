@@ -391,6 +391,16 @@
 
   .delete-confirm p{ font-size:14px; color:var(--ink-soft); }
 
+  /* ---------- 연결 상태 ---------- */
+  .conn-badge{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:12.5px; color:#E3D5BA; padding:8px 10px;
+    white-space:nowrap; flex:0 0 auto;
+  }
+  .conn-badge[data-status="online"]{ color:#9DE0A0; }
+  .conn-badge[data-status="offline"]{ color:#F4A4A4; }
+  .conn-badge[data-status="connecting"]{ color:#E3D5BA; }
+
   footer.app-footer{
     text-align:center; padding:30px 20px 50px; color:var(--ink-faint); font-size:12px;
   }
@@ -427,6 +437,8 @@
       <p>합주 악보 관리 — 악보, 단원, 연습 일정을 한곳에서 관리합니다</p>
     </div>
     <div class="header-actions">
+      <span id="connectionStatus" class="conn-badge">⏳ 연결 중…</span>
+      <button class="btn-ghost-dark" id="firebaseSettingsBtn" type="button" title="Firebase 설정">⚙ DB 설정</button>
       <button class="btn-ghost-dark" id="exportBtn" type="button">⬇ 내보내기</button>
       <button class="btn-ghost-dark" id="importBtn" type="button">⬆ 가져오기</button>
       <input type="file" id="importFile" accept="application/json" hidden>
@@ -713,6 +725,44 @@
   </div>
 </div>
 
+<!-- ===================== Firebase 설정 모달 ===================== -->
+<div class="modal-overlay" id="firebaseModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2>🔥 Firebase 데이터베이스 설정</h2>
+      <button type="button" class="modal-close" id="firebaseModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--status-practice-bg);border:1px solid var(--gold-soft);border-radius:10px;padding:14px 16px;font-size:13.5px;line-height:1.7;color:var(--wood-dark);">
+        <strong>처음 설정 방법</strong><br>
+        1. <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase 콘솔</a>에서 새 프로젝트 만들기<br>
+        2. 왼쪽 메뉴 <strong>빌드 → Realtime Database</strong> → 데이터베이스 만들기 (테스트 모드 선택)<br>
+        3. 프로젝트 개요 ⚙ → <strong>앱 추가 → 웹(&lt;/&gt;)</strong> → 앱 등록<br>
+        4. 표시된 <code>firebaseConfig</code> 객체를 복사해서 아래에 붙여넣기
+      </div>
+      <div class="field" style="margin-top:4px;">
+        <label for="fbConfigInput">firebaseConfig (JSON)</label>
+        <textarea id="fbConfigInput" rows="10" style="font-family:monospace;font-size:12.5px;" placeholder='{
+  "apiKey": "AIza...",
+  "authDomain": "your-project.firebaseapp.com",
+  "databaseURL": "https://your-project-default-rtdb.firebaseio.com",
+  "projectId": "your-project",
+  "storageBucket": "your-project.appspot.com",
+  "messagingSenderId": "000000000000",
+  "appId": "1:000:web:000"
+}'></textarea>
+      </div>
+      <p id="fbConfigError" style="color:var(--danger);font-size:13px;display:none;"></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" id="firebaseModalClose2">취소</button>
+      <button type="button" class="btn-primary" id="fbConnectBtn">🔗 연결</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -720,7 +770,9 @@
   /* ============================================================
      데이터 저장소
   ============================================================ */
-  var STORAGE_KEY = "gyoha_guitar_ensemble_v1";
+  var FB_CONFIG_KEY = "gyoha_firebase_config_v1";
+  var DB_PATH = "gyoha-guitar";
+  var db = null;
   var state = { scores: [], members: [], rehearsals: [], sample: false };
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -809,29 +861,86 @@
     state.rehearsals.forEach(function(r){ r.time = FIXED_REHEARSAL_TIME; });
   }
 
-  function loadState(){
+  /* ============================================================
+     Firebase 연동
+  ============================================================ */
+  function arrayToObj(arr){
+    var obj = {};
+    (arr||[]).forEach(function(item){ if(item && item.id) obj[item.id] = item; });
+    return obj;
+  }
+  function objToArray(obj){
+    if(!obj || typeof obj !== "object") return [];
+    return Object.keys(obj).map(function(k){ return obj[k]; });
+  }
+
+  function setStatus(status){
+    var el = document.getElementById("connectionStatus");
+    if(!el) return;
+    var map = { online:["🟢","연결됨"], offline:["🔴","오프라인"], connecting:["⏳","연결 중…"] };
+    var info = map[status] || map.connecting;
+    el.textContent = info[0] + " " + info[1];
+    el.dataset.status = status;
+  }
+
+  function initFirebase(config){
     try{
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if(raw){
-        var parsed = JSON.parse(raw);
-        state.scores = parsed.scores || [];
-        state.members = parsed.members || [];
-        state.rehearsals = parsed.rehearsals || [];
-        state.sample = !!parsed.sample;
-        migrateData();
-        saveState();
-      } else {
-        seedSampleData();
-        saveState();
-      }
-    }catch(e){
-      console.error("저장된 데이터를 불러오지 못했습니다.", e);
-      seedSampleData();
+      if(!firebase.apps.length){ firebase.initializeApp(config); }
+      else { firebase.app(); }
+      db = firebase.database();
+
+      db.ref(".info/connected").on("value", function(snap){
+        setStatus(snap.val() ? "online" : "offline");
+      });
+
+      db.ref(DB_PATH).on("value", function(snapshot){
+        var data = snapshot.val();
+        if(data){
+          state.scores    = objToArray(data.scores);
+          state.members   = objToArray(data.members);
+          state.rehearsals= objToArray(data.rehearsals);
+          state.sample    = !!data.sample;
+          migrateData();
+        } else {
+          seedSampleData();
+          saveState();
+          return;
+        }
+        renderAll();
+      }, function(err){
+        console.error("Firebase 읽기 오류:", err);
+        setStatus("offline");
+      });
+
+      localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(config));
+      closeModal("firebaseModalOverlay");
+    }catch(err){
+      var errEl = document.getElementById("fbConfigError");
+      if(errEl){ errEl.textContent = "오류: " + err.message; errEl.style.display = "block"; }
+      console.error("Firebase 초기화 오류:", err);
+    }
+  }
+
+  function loadState(){
+    var raw = localStorage.getItem(FB_CONFIG_KEY);
+    if(raw){
+      try{
+        setStatus("connecting");
+        initFirebase(JSON.parse(raw));
+      }catch(e){ openModal("firebaseModalOverlay"); }
+    } else {
+      openModal("firebaseModalOverlay");
     }
   }
 
   function saveState(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if(!db) return;
+    db.ref(DB_PATH).set({
+      scores:     arrayToObj(state.scores),
+      members:    arrayToObj(state.members),
+      rehearsals: arrayToObj(state.rehearsals),
+      sample:     !!state.sample
+    }).catch(function(err){ console.error("Firebase 쓰기 오류:", err); });
   }
 
   /* ============================================================
@@ -1548,8 +1657,59 @@
     refreshPartSuggestions();
   }
 
+  /* ============================================================
+     Firebase 설정 모달 이벤트
+  ============================================================ */
+  function openFirebaseModal(){
+    var raw = localStorage.getItem(FB_CONFIG_KEY);
+    if(raw){
+      try{
+        var cfg = JSON.parse(raw);
+        document.getElementById("fbConfigInput").value = JSON.stringify(cfg, null, 2);
+      }catch(e){}
+    }
+    var errEl = document.getElementById("fbConfigError");
+    if(errEl){ errEl.style.display = "none"; }
+    openModal("firebaseModalOverlay");
+  }
+  document.getElementById("firebaseSettingsBtn").addEventListener("click", openFirebaseModal);
+
+  function closeFirebaseModal(){
+    if(db) closeModal("firebaseModalOverlay");
+    // DB 미연결 상태에서는 닫기 불가 (설정 필수)
+  }
+  document.getElementById("firebaseModalClose").addEventListener("click", closeFirebaseModal);
+  document.getElementById("firebaseModalClose2").addEventListener("click", closeFirebaseModal);
+
+  document.getElementById("fbConnectBtn").addEventListener("click", function(){
+    var raw = document.getElementById("fbConfigInput").value.trim();
+    var errEl = document.getElementById("fbConfigError");
+    errEl.style.display = "none";
+    if(!raw){ errEl.textContent = "설정 값을 입력해주세요."; errEl.style.display = "block"; return; }
+    var cfg;
+    try{
+      // Firebase 콘솔에서 복사한 형태 (const firebaseConfig = {...}) 도 지원
+      var jsonStr = raw.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1");
+      cfg = JSON.parse(jsonStr);
+    }catch(e){
+      errEl.textContent = "JSON 형식이 올바르지 않습니다. { } 블록만 붙여넣어 주세요.";
+      errEl.style.display = "block";
+      return;
+    }
+    if(!cfg.databaseURL){
+      errEl.textContent = "databaseURL이 없습니다. Realtime Database를 활성화했는지 확인해주세요.";
+      errEl.style.display = "block";
+      return;
+    }
+    // 앱이 이미 초기화된 경우 기존 앱 삭제 후 재시작
+    if(firebase.apps.length){
+      firebase.app().delete().then(function(){ db = null; initFirebase(cfg); });
+    } else {
+      initFirebase(cfg);
+    }
+  });
+
   loadState();
-  renderAll();
 
 })();
 </script>
