@@ -774,6 +774,17 @@
   var FB_CONFIG_KEY = "gyoha_firebase_config_v1";
   var DB_PATH = "gyoha-guitar";
   var db = null;
+
+  // 기본 Firebase 설정 — URL만 열면 자동 연결
+  var DEFAULT_FB_CONFIG = {
+    apiKey: "AIzaSyDzkdnSQqFNG9vG54CAaT8xTi6pJxl8mOQ",
+    authDomain: "khmasscg.firebaseapp.com",
+    databaseURL: "https://khmasscg-default-rtdb.firebaseio.com",
+    projectId: "khmasscg",
+    storageBucket: "khmasscg.firebasestorage.app",
+    messagingSenderId: "618708075654",
+    appId: "1:618708075654:web:fe60dda22f97a878df3d07"
+  };
   var state = { scores: [], members: [], rehearsals: [], sample: false };
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -928,10 +939,12 @@
       try{
         setStatus("connecting");
         initFirebase(JSON.parse(raw));
-      }catch(e){ openModal("firebaseModalOverlay"); }
-    } else {
-      openModal("firebaseModalOverlay");
+        return;
+      }catch(e){}
     }
+    // localStorage에 설정 없으면 기본 설정으로 자동 연결
+    setStatus("connecting");
+    initFirebase(DEFAULT_FB_CONFIG);
   }
 
   function saveState(){
