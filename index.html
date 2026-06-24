@@ -1381,20 +1381,22 @@
   function renderPartAssign(){
     var box = document.getElementById("partAssignList");
     var empty = document.getElementById("partAssignEmpty");
-    document.getElementById("assignCount").textContent = "(" + state.scores.length + ")";
 
-    if(state.scores.length === 0){
+    var eligible = state.scores.filter(function(s){ return (s.type||"합주") !== "공지"; });
+    document.getElementById("assignCount").textContent = "(" + eligible.length + ")";
+
+    if(eligible.length === 0){
       box.innerHTML = "";
       empty.style.display = "block";
       return;
     }
     empty.style.display = "none";
 
-    var list = state.scores.slice().sort(function(a,b){ return (a.title||"").localeCompare(b.title||"","ko"); });
+    var list = eligible.slice().sort(function(a,b){ return (a.title||"").localeCompare(b.title||"","ko"); });
     box.innerHTML = list.map(function(s){
       var body = (s.parts && s.parts.length)
         ? s.parts.map(function(p, idx){ return assignRowHtml(s, p, idx); }).join("")
-        : '<p class="assign-no-parts">등록된 파트가 없습니다. 악보함에서 “수정”을 눌러 파트를 추가해주세요.</p>';
+        : '<p class="assign-no-parts">등록된 파트가 없습니다. 악보함에서 "수정"을 눌러 파트를 추가해주세요.</p>';
       return '<div class="assign-card">'+
         '<h3>'+escapeHtml(s.title)+'</h3>'+
         (s.composer ? '<div class="composer-sub">'+escapeHtml(s.composer)+'</div>' : '')+
