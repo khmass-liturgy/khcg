@@ -1481,6 +1481,7 @@
         '<div class="date">'+formatDateFull(r.date)+(r.time?'  '+r.time:'')+'</div>'+
         '<div class="meta">'+escapeHtml(r.location||"장소 미정")+'</div>'+
         (titles.length ? '<div class="pieces">'+titles.map(function(t){return '<span>'+escapeHtml(t)+'</span>';}).join("")+'</div>' : '')+
+        (r.memo ? '<div style="margin-top:10px;font-size:13px;color:#D8C6A9;border-top:1px solid rgba(251,243,226,0.15);padding-top:10px;">📝 '+escapeHtml(r.memo)+'</div>' : '')+
       '</div>'+
     '</div>';
   }
