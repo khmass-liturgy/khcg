@@ -296,8 +296,21 @@
     background:linear-gradient(135deg, var(--wood-dark), #4A301F);
     color:#F3E9D6; border-radius:var(--radius); padding:20px 22px;
     margin-bottom:20px; box-shadow:var(--shadow-lift);
-    display:flex; gap:18px; flex-wrap:wrap; align-items:center;
+    display:flex; gap:0; align-items:stretch; overflow:hidden;
   }
+  .next-rehearsal .left-col{ flex:1 1 0; min-width:0; padding-right:16px; display:flex; flex-direction:column; justify-content:center; }
+  .next-rehearsal .right-col{
+    flex:0 0 42%; max-width:42%;
+    border-left:1px solid rgba(251,243,226,0.15);
+    padding-left:20px;
+    display:flex; flex-direction:column; justify-content:center; gap:8px;
+  }
+  .next-rehearsal .right-col:empty{ display:none; }
+  .next-rehearsal .notice-item{
+    font-family:var(--serif); font-size:22px; font-weight:700;
+    color:#FBF3E2; line-height:1.25;
+  }
+  .next-rehearsal .notice-item + .notice-item{ border-top:1px solid rgba(251,243,226,0.12); padding-top:8px; }
   .next-rehearsal .label{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-soft); }
   .next-rehearsal .date{ font-family:var(--serif); font-size:24px; font-weight:700; margin-top:2px; }
   .next-rehearsal .meta{ font-size:13.5px; color:#E3D5BA; margin-top:4px; }
@@ -408,7 +421,9 @@
   @media (max-width:600px){
     .header-inner{ padding-bottom:18px; }
     .header-text h1{ font-size:21px; }
-    .next-rehearsal{ padding:16px; }
+    .next-rehearsal{ padding:16px; flex-direction:column; }
+    .next-rehearsal .right-col{ flex:unset; max-width:100%; border-left:none; border-top:1px solid rgba(251,243,226,0.15); padding-left:0; padding-top:12px; margin-top:12px; }
+    .next-rehearsal .notice-item{ font-size:18px; }
     .member-table{ font-size:13px; }
   }
 
@@ -1483,15 +1498,38 @@
     var box = document.getElementById("nextRehearsal");
     if(upcoming.length === 0){ box.innerHTML = ""; return; }
     var r = upcoming[0];
-    var titles = pieceTitlesByIds(r.pieceIds);
+
+    // 연습곡과 공지 분리
+    var pieceIds = r.pieceIds || [];
+    var noticeIds = FIXED_NOTICE_ITEMS.map(function(x){ return x.id; });
+    var practicePieces = pieceIds.filter(function(id){
+      if(noticeIds.indexOf(id) > -1) return false;
+      var s = state.scores.find(function(x){ return x.id === id; });
+      return s && s.type !== "공지";
+    });
+    var noticeItems = pieceIds.filter(function(id){
+      if(noticeIds.indexOf(id) > -1) return true;
+      var s = state.scores.find(function(x){ return x.id === id; });
+      return s && s.type === "공지";
+    });
+
+    var practiceTitles = pieceTitlesByIds(practicePieces);
+    var noticeTitles   = pieceTitlesByIds(noticeItems);
+
+    // 우측 패널 (공지 큰 글씨)
+    var rightHtml = noticeTitles.length
+      ? noticeTitles.map(function(t){ return '<div class="notice-item">'+escapeHtml(t)+'</div>'; }).join("")
+      : "";
+
     box.innerHTML = '<div class="next-rehearsal">'+
-      '<div>'+
+      '<div class="left-col">'+
         '<div class="label">다음 연습</div>'+
         '<div class="date">'+formatDateFull(r.date)+(r.time?'  '+r.time:'')+'</div>'+
         '<div class="meta">'+escapeHtml(r.location||"장소 미정")+'</div>'+
-        (titles.length ? '<div class="pieces">'+titles.map(function(t){return '<span>'+escapeHtml(t)+'</span>';}).join("")+'</div>' : '')+
+        (practiceTitles.length ? '<div class="pieces">'+practiceTitles.map(function(t){return '<span>'+escapeHtml(t)+'</span>';}).join("")+'</div>' : '')+
         (r.memo ? '<div style="margin-top:10px;font-size:13px;color:#D8C6A9;border-top:1px solid rgba(251,243,226,0.15);padding-top:10px;">📝 '+escapeHtml(r.memo)+'</div>' : '')+
       '</div>'+
+      (rightHtml ? '<div class="right-col">'+rightHtml+'</div>' : '')+
     '</div>';
   }
 
