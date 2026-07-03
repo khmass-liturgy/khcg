@@ -711,7 +711,7 @@
           <input type="text" id="rehearsalLocation" placeholder="교하성당 마테오방">
         </div>
         <div class="field">
-          <label>연습곡 및 기타 내용 <span class="hint">이번 수업에서 다룰 항목을 선택하세요</span></label>
+          <label>연습곡 및 공지(기타) <span class="hint">이번 수업에서 다룰 항목을 선택하세요</span></label>
           <div id="pieceCheckboxes" class="checkbox-list"></div>
         </div>
         <div class="field">
@@ -1460,8 +1460,17 @@
   /* ============================================================
      연습 일정
   ============================================================ */
+  // 고정 공지(기타) 항목 — 악보함과 무관하게 항상 표시
+  var FIXED_NOTICE_ITEMS = [
+    { id: "NOTICE_발표회", title: "월례발표회" },
+    { id: "NOTICE_휴강",   title: "휴강" },
+    { id: "NOTICE_시간변경", title: "수업 시간변경" }
+  ];
+
   function pieceTitlesByIds(ids){
     return (ids||[]).map(function(id){
+      var fixed = FIXED_NOTICE_ITEMS.find(function(x){ return x.id === id; });
+      if(fixed) return fixed.title;
       var s = state.scores.find(function(x){ return x.id === id; });
       return s ? s.title : null;
     }).filter(Boolean);
@@ -1543,30 +1552,41 @@
 
   function renderPieceCheckboxes(selectedIds){
     var box = document.getElementById("pieceCheckboxes");
-    if(state.scores.length === 0){
-      box.innerHTML = '<span style="color:var(--ink-faint); font-size:13px;">등록된 악보가 없습니다. 먼저 악보함에 곡을 추가하세요.</span>';
-      return;
-    }
     selectedIds = selectedIds || [];
 
     var pieces  = state.scores.filter(function(s){ return (s.type||"합주") !== "공지"; });
     var notices = state.scores.filter(function(s){ return s.type === "공지"; });
 
-    function makeItem(s){
-      var checked = selectedIds.indexOf(s.id) > -1 ? "checked" : "";
-      return '<label><input type="checkbox" value="'+s.id+'" '+checked+'> '+escapeHtml(s.title)+'</label>';
+    function makeItem(id, title){
+      var checked = selectedIds.indexOf(id) > -1 ? "checked" : "";
+      return '<label><input type="checkbox" value="'+escapeHtml(id)+'" '+checked+'> '+escapeHtml(title)+'</label>';
     }
 
     var html = "";
+
+    // 연습곡 섹션
     if(pieces.length){
       html += '<div style="font-size:11.5px;font-weight:700;color:var(--wood);margin-bottom:4px;letter-spacing:.04em;">🎶 연습곡</div>';
-      html += pieces.map(makeItem).join("");
+      html += pieces.map(function(s){ return makeItem(s.id, s.title); }).join("");
     }
-    if(notices.length){
+
+    // 공지(기타) 섹션 — 고정 항목 + 악보함의 공지 타입
+    var hasNoticeSection = notices.length > 0 || FIXED_NOTICE_ITEMS.length > 0;
+    if(hasNoticeSection){
       if(pieces.length) html += '<div style="height:1px;background:var(--paper-line);margin:8px 0;"></div>';
-      html += '<div style="font-size:11.5px;font-weight:700;color:var(--wood);margin-bottom:4px;letter-spacing:.04em;">📢 기타 내용</div>';
-      html += notices.map(makeItem).join("");
+      html += '<div style="font-size:11.5px;font-weight:700;color:var(--wood);margin-bottom:4px;letter-spacing:.04em;">📢 공지(기타)</div>';
+      // 고정 항목 먼저
+      html += FIXED_NOTICE_ITEMS.map(function(item){ return makeItem(item.id, item.title); }).join("");
+      // 악보함 공지 타입
+      if(notices.length){
+        html += notices.map(function(s){ return makeItem(s.id, s.title); }).join("");
+      }
     }
+
+    if(!pieces.length && !hasNoticeSection){
+      html = '<span style="color:var(--ink-faint); font-size:13px;">등록된 악보가 없습니다. 먼저 악보함에 곡을 추가하세요.</span>';
+    }
+
     box.innerHTML = html;
   }
 
