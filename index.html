@@ -976,24 +976,35 @@
         setStatus(snap.val() ? "online" : "offline");
       });
 
+      var rendered = false;
       db.ref(DB_PATH).on("value", function(snapshot){
-        var data = snapshot.val();
-        if(data){
-          state.scores    = objToArray(data.scores);
-          state.members   = objToArray(data.members);
-          state.rehearsals= objToArray(data.rehearsals);
-          state.sample    = !!data.sample;
-          migrateData();
-        } else {
-          seedSampleData();
-          saveState();
-          return;
+        try{
+          var data = snapshot.val();
+          if(data){
+            state.scores    = objToArray(data.scores);
+            state.members   = objToArray(data.members);
+            state.rehearsals= objToArray(data.rehearsals);
+            state.sample    = !!data.sample;
+            migrateData();
+          } else {
+            seedSampleData();
+            saveState();
+          }
+        }catch(e){
+          console.error("데이터 처리 오류:", e);
         }
+        rendered = true;
         renderAll();
       }, function(err){
         console.error("Firebase 읽기 오류:", err);
         setStatus("offline");
+        if(!rendered){ rendered = true; renderAll(); }
       });
+
+      // 5초 후에도 렌더가 안 됐으면 비상 렌더
+      setTimeout(function(){
+        if(!rendered){ rendered = true; renderAll(); }
+      }, 5000);
 
       localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(config));
       closeModal("firebaseModalOverlay");
