@@ -258,14 +258,17 @@
 
   /* ---------- members ---------- */
   .member-groups{ display:flex; flex-direction:column; gap:18px; }
-  .member-group h3{ font-size:15px; color:var(--wood); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
-  .member-group h3::after{ content:""; flex:1; height:1px; background:var(--paper-line); }
-  .member-table{ width:100%; border-collapse:collapse; background:var(--paper); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); }
+  .member-group h3{ font-size:15px; color:var(--wood); margin-bottom:8px; display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .member-group h3::after{ content:""; flex:1; height:1px; background:var(--paper-line); min-width:20px; }
+  .member-table-wrap{ overflow-x:auto; border-radius:var(--radius); box-shadow:var(--shadow); }
+  .member-table{ width:100%; min-width:520px; border-collapse:collapse; background:var(--paper); border-radius:var(--radius); overflow:hidden; }
   .member-table th{
     text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em;
     color:var(--ink-faint); background:#F0E8D6; padding:10px 14px; font-weight:600;
+    white-space:nowrap;
   }
   .member-table td{ padding:11px 14px; font-size:14px; border-top:1px solid var(--paper-line); vertical-align:middle; }
+  .member-table td:first-child{ white-space:nowrap; font-weight:500; }
   .member-table tr:hover td{ background:#FFFCF5; }
   .member-actions{ display:flex; gap:10px; justify-content:flex-end; }
 
@@ -619,6 +622,10 @@
     <div class="bar-block">
       <h3>파트별 단원 수</h3>
       <div id="partBars"></div>
+    </div>
+    <div class="bar-block">
+      <h3>개인별 출석 현황</h3>
+      <div id="attendStatsBars"></div>
     </div>
   </section>
 
@@ -1386,11 +1393,13 @@
       container.innerHTML = keys.map(function(k){
         return '<div class="member-group">'+
           '<h3>'+escapeHtml(k)+' <span style="font-weight:400;color:var(--ink-faint);font-size:12px;">'+groups[k].length+'명</span></h3>'+
+          '<div class="member-table-wrap">'+
           '<table class="member-table"><thead><tr>'+
             '<th>이름</th><th>연락처</th><th>가입일</th><th>메모</th><th></th>'+
           '</tr></thead><tbody>'+
             groups[k].map(memberRowHtml).join("")+
           '</tbody></table>'+
+          '</div>'+
         '</div>';
       }).join("");
     }
@@ -1912,6 +1921,34 @@
     document.getElementById("partBars").innerHTML = partKeys.length
       ? partKeys.map(function(k,i){ return barRow(k, partCounts[k], memberTotal, PART_COLORS[i % PART_COLORS.length]); }).join("")
       : '<p style="color:var(--ink-faint); font-size:13px;">등록된 단원이 없습니다.</p>';
+
+    // 개인별 출석 현황 — 출석 데이터가 있는 일정만 집계
+    var checkedRehearsals = state.rehearsals.filter(function(r){
+      return r.attendance && Object.keys(r.attendance).length > 0;
+    });
+    var attendBox = document.getElementById("attendStatsBars");
+    if(state.members.length === 0 || checkedRehearsals.length === 0){
+      attendBox.innerHTML = '<p style="color:var(--ink-faint); font-size:13px;">출석 체크된 일정이 아직 없습니다.</p>';
+    } else {
+      var totalSessions = checkedRehearsals.length;
+      var rows = state.members.map(function(m){
+        var presentCount = checkedRehearsals.filter(function(r){ return r.attendance[m.id] === true; }).length;
+        return { name: m.name, part: m.part||"", count: presentCount };
+      });
+      // 출석 많은 순 정렬
+      rows.sort(function(a,b){ return b.count - a.count || a.name.localeCompare(b.name,"ko"); });
+      attendBox.innerHTML =
+        '<p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 10px;">출석 체크된 일정 '+totalSessions+'회 기준</p>'+
+        rows.map(function(row){
+          var pct = totalSessions ? Math.round(row.count/totalSessions*100) : 0;
+          var label = row.name + (row.part ? ' ('+row.part+')' : '');
+          return '<div class="bar-row">'+
+            '<div class="name" style="flex:0 0 130px;">'+escapeHtml(label)+'</div>'+
+            '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%; background:var(--status-done);"></div></div>'+
+            '<div class="val" style="flex:0 0 58px;">'+row.count+'/'+totalSessions+'회</div>'+
+          '</div>';
+        }).join("");
+    }
   }
 
   /* ============================================================
