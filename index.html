@@ -636,7 +636,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.20-3</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.20-6</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -731,8 +731,8 @@
         <div class="field-row">
           <div class="field">
             <label for="memberPart">담당 파트</label>
-            <input type="text" id="memberPart" list="partSuggestions" placeholder="예: 1st Guitar">
-            <datalist id="partSuggestions"></datalist>
+            <select id="memberPart"></select>
+            <input type="text" id="memberPartCustom" style="display:none;margin-top:6px;" placeholder="새 파트명 입력 (예: 1st Guitar)">
           </div>
           <div class="field">
             <label for="memberPhone">연락처</label>
@@ -1200,9 +1200,24 @@
     state.members.forEach(function(m){ if(m.part) names[m.part]=true; });
     return Object.keys(names).sort();
   }
+  function populateMemberPartSelect(selected){
+    var sel = document.getElementById("memberPart");
+    if(!sel) return;
+    var names = collectPartNames();
+    if(selected && selected !== "__custom__" && names.indexOf(selected) === -1) names.push(selected);
+    names.sort();
+    var html = '<option value="">파트 미지정</option>';
+    names.forEach(function(n){
+      html += '<option value="'+escapeHtml(n)+'"'+(n === selected ? ' selected' : '')+'>'+escapeHtml(n)+'</option>';
+    });
+    html += '<option value="__custom__"'+(selected === "__custom__" ? ' selected' : '')+'>➕ 직접 입력…</option>';
+    sel.innerHTML = html;
+  }
+
   function refreshPartSuggestions(){
-    var dl = document.getElementById("partSuggestions");
-    dl.innerHTML = collectPartNames().map(function(n){ return '<option value="'+escapeHtml(n)+'">'; }).join("");
+    var sel = document.getElementById("memberPart");
+    if(!sel) return;
+    populateMemberPartSelect(sel.value);
   }
 
   /* ============================================================
@@ -1453,9 +1468,93 @@
   /* ============================================================
      단원
   ============================================================ */
+  /* ============================================================
+     세례명 축일 (khmass-liturgy/mass 저장소의 feast_days.json 연동)
+  ============================================================ */
+  var FEAST_URL = "https://khmass-liturgy.github.io/mass/feast_days.json";
+  var feastMap = null;
+
+  // 같은 세례명의 성인이 여럿일 때 한국 교회에서 널리 쓰는 기본 축일
+  var FEAST_DEFAULTS = {
+    "야고보": "07-25",       // 대야고보
+    "프란치스코": "10-04",   // 아시시
+    "카타리나": "04-29",     // 시에나
+    "데레사": "10-01",       // 소화 데레사
+    "마리아": "01-01",       // 천주의 성모
+    "요셉": "03-19",
+    "바오로": "06-29",
+    "베드로": "06-29",
+    "요한": "12-27",         // 사도 요한
+    "안토니오": "06-13",     // 파도바
+    "이냐시오": "07-31",     // 로욜라
+    "토마스": "07-03",       // 사도
+    "마르티노": "11-11",     // 투르
+    "비오": "09-23"          // 피에트렐치나
+  };
+
+  function buildFeastMap(saints){
+    var map = {};       // 정규화된 이름 → {date, title}
+    var byBase = {};    // 기본 이름 → 후보 목록
+    (saints||[]).forEach(function(s){
+      if(!s || !s.name || !s.date) return;
+      var raw  = s.name.replace(/\s+/g, "");
+      var base = raw.replace(/\(.*\)$/, "");
+      var qm   = raw.match(/\((.+)\)$/);
+      var qual = qm ? qm[1] : "";
+      var entry = { date: s.date, title: s.title || s.name };
+      [raw, qual + base, base + qual].forEach(function(k){
+        if(k && !map[k]) map[k] = entry;
+      });
+      if(!byBase[base]) byBase[base] = [];
+      byBase[base].push(entry);
+    });
+    // 기본 이름 단독 표기: 기본값 우선, 없으면 첫 후보
+    Object.keys(byBase).forEach(function(base){
+      if(map[base]) return;
+      var cands = byBase[base];
+      var def = FEAST_DEFAULTS[base];
+      var pick = def ? cands.filter(function(c){ return c.date === def; })[0] : null;
+      map[base] = pick || cands[0];
+    });
+    return map;
+  }
+
+  function getFeastInfo(fullName){
+    if(!feastMap || !fullName) return null;
+    var tokens = fullName.trim().split(/\s+/);
+    if(tokens.length < 2) return null;
+    var bap = tokens.slice(1).join("");   // 이름 뒤 전체를 세례명으로 간주
+    if(feastMap[bap]) return feastMap[bap];
+    // 부분 일치: "요안나" → "요안나프란치스카" 등
+    var keys = Object.keys(feastMap);
+    for(var i = 0; i < keys.length; i++){
+      if(keys[i].indexOf(bap) === 0 || bap.indexOf(keys[i]) === 0) return feastMap[keys[i]];
+    }
+    return null;
+  }
+
+  function feastBadgeHtml(m){
+    var f = getFeastInfo(m.name);
+    if(!f) return "";
+    var md = f.date.split("-");
+    var label = parseInt(md[0],10) + "/" + parseInt(md[1],10);
+    return ' <span style="font-size:11.5px;color:var(--gold);white-space:nowrap;font-weight:600;" title="'+escapeHtml(f.title)+'">🕊 축일 '+label+'</span>';
+  }
+
+  function loadFeastDays(){
+    fetch(FEAST_URL)
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        feastMap = buildFeastMap(data && data.saints);
+        renderMembers();
+      })
+      .catch(function(err){ console.warn("축일 데이터 로드 실패:", err); });
+  }
+  loadFeastDays();
+
   function memberRowHtml(m){
     return '<tr data-id="'+m.id+'">'+
-      '<td>'+escapeHtml(m.name)+(m.sample?' <span class="badge badge-sample">샘플</span>':'')+'</td>'+
+      '<td>'+escapeHtml(m.name)+feastBadgeHtml(m)+(m.sample?' <span class="badge badge-sample">샘플</span>':'')+'</td>'+
       '<td>'+escapeHtml(m.phone||"—")+'</td>'+
       '<td>'+(m.joinDate?escapeHtml(m.joinDate):"—")+'</td>'+
       '<td>'+escapeHtml(m.memo||"—")+'</td>'+
@@ -1523,22 +1622,40 @@
     document.getElementById("memberModalTitle").textContent = m ? "단원 수정" : "단원 추가";
     document.getElementById("memberId").value = m ? m.id : "";
     document.getElementById("memberName").value = m ? m.name : "";
-    document.getElementById("memberPart").value = m ? m.part||"" : "";
+    populateMemberPartSelect(m ? m.part||"" : "");
+    var customInput = document.getElementById("memberPartCustom");
+    customInput.style.display = "none";
+    customInput.value = "";
     document.getElementById("memberPhone").value = m ? m.phone||"" : "";
     document.getElementById("memberJoin").value = m ? m.joinDate||"" : "";
     document.getElementById("memberMemo").value = m ? m.memo||"" : "";
-    refreshPartSuggestions();
     openModal("memberModalOverlay");
     document.getElementById("memberName").focus();
   }
+
+  // 담당 파트 "직접 입력…" 선택 시 입력칸 표시
+  document.getElementById("memberPart").addEventListener("change", function(){
+    var customInput = document.getElementById("memberPartCustom");
+    if(this.value === "__custom__"){
+      customInput.style.display = "";
+      customInput.focus();
+    } else {
+      customInput.style.display = "none";
+      customInput.value = "";
+    }
+  });
   document.getElementById("addMemberBtn").addEventListener("click", function(){ openMemberModal(null); });
 
   document.getElementById("memberForm").addEventListener("submit", function(e){
     e.preventDefault();
     var id = document.getElementById("memberId").value;
+    var partSel = document.getElementById("memberPart").value;
+    var partVal = partSel === "__custom__"
+      ? document.getElementById("memberPartCustom").value.trim()
+      : partSel;
     var data = {
       name: document.getElementById("memberName").value.trim(),
-      part: document.getElementById("memberPart").value.trim(),
+      part: partVal,
       phone: document.getElementById("memberPhone").value.trim(),
       joinDate: document.getElementById("memberJoin").value,
       memo: document.getElementById("memberMemo").value.trim()
@@ -1827,27 +1944,22 @@
       return;
     }
 
-    var groups = {};
-    state.members.forEach(function(m){
-      var key = m.part || "파트 미지정";
-      if(!groups[key]) groups[key] = [];
-      groups[key].push(m);
+    // 파트 구분 없이 이름 가나다순으로 정렬
+    var sorted = state.members.slice().sort(function(a,b){
+      return (a.name||"").localeCompare(b.name||"","ko");
     });
 
     var html = "";
-    Object.keys(groups).sort().forEach(function(key){
-      html += '<div class="attend-group-label">'+escapeHtml(key)+'</div>';
-      groups[key].forEach(function(m){
-        var isPresent = att[m.id] === true;
-        var isAbsent  = att[m.id] === false;
-        html += '<div class="attend-row">'+
-          '<span class="name">'+escapeHtml(m.name)+'</span>'+
-          '<div class="attend-toggle">'+
-            '<button class="attend-btn'+(isPresent?' present':'')+'" data-mid="'+m.id+'" data-val="present">출석</button>'+
-            '<button class="attend-btn'+(isAbsent?' absent':'')+'" data-mid="'+m.id+'" data-val="absent">결석</button>'+
-          '</div>'+
-        '</div>';
-      });
+    sorted.forEach(function(m){
+      var isPresent = att[m.id] === true;
+      var isAbsent  = att[m.id] === false;
+      html += '<div class="attend-row">'+
+        '<span class="name">'+escapeHtml(m.name)+'</span>'+
+        '<div class="attend-toggle">'+
+          '<button class="attend-btn'+(isPresent?' present':'')+'" data-mid="'+m.id+'" data-val="present">출석</button>'+
+          '<button class="attend-btn'+(isAbsent?' absent':'')+'" data-mid="'+m.id+'" data-val="absent">결석</button>'+
+        '</div>'+
+      '</div>';
     });
     box.innerHTML = html;
     renderAttendTallyPage(att);
