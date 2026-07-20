@@ -478,6 +478,7 @@
     </div>
     <div class="header-actions">
       <span id="connectionStatus" class="conn-badge">⏳ 연결 중…</span>
+      <span id="saveIndicator" class="conn-badge" style="display:none;"></span>
       <button class="btn-ghost-dark" id="installBtn" type="button">📲 홈화면 추가</button>
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
@@ -635,7 +636,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.06-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.20-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1074,15 +1075,74 @@
     initFirebase(DEFAULT_FB_CONFIG);
   }
 
-  function saveState(){
+  // ---- 저장 디바운스: 짧은 시간에 여러 번 바뀌어도 Firebase 쓰기는 한 번만 ----
+  var saveDebounceTimer = null;
+  var saveInFlight = false;
+  var saveQueuedAgain = false;
+
+  function updateSaveIndicator(state){
+    var el = document.getElementById("saveIndicator");
+    if(!el) return;
+    clearTimeout(updateSaveIndicator._hideTimer);
+    if(state === "pending" || state === "saving"){
+      el.textContent = "💾 저장 중…";
+      el.style.color = "#E3D5BA";
+      el.style.display = "";
+    } else if(state === "saved"){
+      el.textContent = "✅ 저장됨";
+      el.style.color = "#9DE0A0";
+      el.style.display = "";
+      updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 1400);
+    } else if(state === "error"){
+      el.textContent = "⚠️ 저장 실패 (재시도 중)";
+      el.style.color = "#F4A4A4";
+      el.style.display = "";
+    }
+  }
+
+  function flushSaveState(){
     if(!db) return;
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = null;
+    if(saveInFlight){ saveQueuedAgain = true; return; }
+    saveInFlight = true;
+    updateSaveIndicator("saving");
     db.ref(DB_PATH).set({
       scores:     arrayToObj(state.scores),
       members:    arrayToObj(state.members),
       rehearsals: arrayToObj(state.rehearsals),
       sample:     !!state.sample
-    }).catch(function(err){ console.error("Firebase 쓰기 오류:", err); });
+    }).then(function(){
+      saveInFlight = false;
+      if(saveQueuedAgain){
+        saveQueuedAgain = false;
+        flushSaveState();
+      } else {
+        updateSaveIndicator("saved");
+      }
+    }).catch(function(err){
+      console.error("Firebase 쓰기 오류:", err);
+      saveInFlight = false;
+      updateSaveIndicator("error");
+      // 실패 시 잠시 후 다시 시도
+      saveDebounceTimer = setTimeout(flushSaveState, 2000);
+    });
   }
+
+  function saveState(){
+    if(!db) return;
+    updateSaveIndicator("pending");
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(flushSaveState, 700);
+  }
+
+  // 탭을 벗어나거나 창을 닫기 직전에는 대기 중인 저장을 바로 반영
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden && saveDebounceTimer){ flushSaveState(); }
+  });
+  window.addEventListener("beforeunload", function(){
+    if(saveDebounceTimer){ flushSaveState(); }
+  });
 
   /* ============================================================
      탭 전환
@@ -1551,13 +1611,31 @@
     if(e.target.type !== "checkbox") return;
     var scoreId = e.target.dataset.score;
     var idx = parseInt(e.target.dataset.idx, 10);
+    var memberId = e.target.value;
     var s = state.scores.find(function(x){ return x.id === scoreId; });
     if(s && s.parts && s.parts[idx]){
+      if(e.target.checked){
+        // 같은 곡의 다른 파트에 이미 배정된 경우 자동으로 해제 (한 곡당 한 파트만 담당)
+        s.parts.forEach(function(otherPart, otherIdx){
+          if(otherIdx === idx || !otherPart.memberIds) return;
+          var before = otherPart.memberIds.length;
+          otherPart.memberIds = otherPart.memberIds.filter(function(id){ return id !== memberId; });
+          if(otherPart.memberIds.length !== before){
+            var otherBox = document.querySelector(
+              '#partAssignList input[type="checkbox"][data-score="'+scoreId+'"][data-idx="'+otherIdx+'"][value="'+memberId+'"]'
+            );
+            if(otherBox){
+              otherBox.checked = false;
+              otherBox.closest(".member-chip").classList.remove("checked");
+            }
+          }
+        });
+      }
       var ids = s.parts[idx].memberIds || [];
       if(e.target.checked){
-        if(ids.indexOf(e.target.value) === -1) ids.push(e.target.value);
+        if(ids.indexOf(memberId) === -1) ids.push(memberId);
       } else {
-        ids = ids.filter(function(id){ return id !== e.target.value; });
+        ids = ids.filter(function(id){ return id !== memberId; });
       }
       s.parts[idx].memberIds = ids;
       e.target.closest(".member-chip").classList.toggle("checked", e.target.checked);
