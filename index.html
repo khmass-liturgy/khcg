@@ -642,7 +642,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.24-1</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.24-2</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1276,7 +1276,7 @@
   }
 
   function scoreCardHtml(s){
-    var partsHtml = (s.parts||[]).map(function(p){
+    var partsHtml = (s.type !== "합주" ? [] : (s.parts||[])).map(function(p){
       if(!p.name) return "";
       var memberNames = (p.memberIds||[]).map(function(id){
         var m = state.members.find(function(x){ return x.id === id; });
@@ -1416,8 +1416,8 @@
       rows.innerHTML = parts.map(function(p){ return partRowHtml(p.name, p.link); }).join("");
       partSection.style.display = "";
     } else {
-      // 독주/공지 — 파트 섹션 숨기고 기존 파트 유지(지우지 않음)
-      rows.innerHTML = (s && s.parts||[]).map(function(p){ return partRowHtml(p.name, p.link); }).join("");
+      // 독주/공지 — 파트가 필요 없는 악보이므로 파트 입력칸을 완전히 비우고 숨김
+      rows.innerHTML = "";
       partSection.style.display = "none";
     }
     openModal("scoreModalOverlay");
@@ -1434,6 +1434,8 @@
           partRowHtml("1st Guitar","") + partRowHtml("2nd Guitar","");
       }
     } else {
+      // 독주/공지는 파트가 없으므로 입력돼 있던 파트 행을 모두 비움
+      document.getElementById("partRows").innerHTML = "";
       partSection.style.display = "none";
     }
   });
@@ -1455,11 +1457,14 @@
       return { name: name, link: link, memberIds: memberIds };
     }).filter(function(p){ return p.name; });
 
+    var scoreTypeValue = document.getElementById("scoreType").value;
+    if(scoreTypeValue !== "합주"){ parts = []; } // 독주/공지는 어떤 경우에도 파트를 저장하지 않음
+
     var data = {
       title: document.getElementById("scoreTitle").value.trim(),
       composer: document.getElementById("scoreComposer").value.trim(),
       arranger: document.getElementById("scoreArranger").value.trim(),
-      type: document.getElementById("scoreType").value,
+      type: scoreTypeValue,
       difficulty: document.getElementById("scoreDifficulty").value,
       status: document.getElementById("scoreStatus").value,
       scoreLink: document.getElementById("scoreLink").value.trim(),
