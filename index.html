@@ -642,7 +642,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.24-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.07.30-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1884,7 +1884,12 @@
 
   function renderRehearsals(){
     renderNextRehearsal();
-    var list = state.rehearsals.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var today = todayISO();
+    var upcoming = state.rehearsals.filter(function(r){ return r.date >= today; })
+      .sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var past = state.rehearsals.filter(function(r){ return r.date < today; })
+      .sort(function(a,b){ return b.date.localeCompare(a.date); });
+    var list = upcoming.concat(past);
     var box = document.getElementById("rehearsalList");
     var empty = document.getElementById("rehearsalEmpty");
     document.getElementById("rehearsalCount").textContent = "(" + state.rehearsals.length + ")";
