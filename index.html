@@ -682,14 +682,15 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.02-3</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.02-4</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
     <div id="adminLoggedOut" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;">
-      <input type="email" id="adminEmail" placeholder="운영자 이메일" autocomplete="username" style="font-size:12px;padding:7px 9px;border-radius:8px;border:1px solid var(--paper-line);width:150px;background:var(--paper);color:var(--ink);">
-      <input type="password" id="adminPassword" placeholder="비밀번호" autocomplete="current-password" style="font-size:12px;padding:7px 9px;border-radius:8px;border:1px solid var(--paper-line);width:120px;background:var(--paper);color:var(--ink);">
-      <button class="btn-secondary" id="adminLoginBtn" type="button" style="font-size:12px;padding:7px 12px;">로그인</button>
+      <button class="btn-secondary" id="adminLoginBtn" type="button" style="font-size:12.5px;padding:8px 14px;display:inline-flex;align-items:center;gap:7px;">
+        <svg width="15" height="15" viewBox="0 0 48 48" style="flex:0 0 auto;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.6 6.1 29.6 4 24 4 15.9 4 8.9 8.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.4-2 14-5.4l-6.5-5.5c-2 1.5-4.6 2.5-7.5 2.5-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C8.9 39.5 15.9 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.5 5.5C41.4 36 44 30.5 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+        Google로 로그인
+      </button>
     </div>
     <div id="adminLoggedIn" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;">
       <span id="adminEmailLabel" style="font-size:12px;color:var(--ink-soft);"></span>
@@ -962,6 +963,10 @@
   var db = null;
   var auth = null;
 
+  // 운영자로 인정할 구글 계정 이메일 목록 — 여기 없는 계정은 구글 로그인은 되어도 쓰기 권한이 없습니다.
+  // (실제 쓰기 권한은 Firebase Realtime Database 규칙에서도 동일하게 검사해야 합니다 — 아래 안내 참고)
+  var ADMIN_EMAILS = ["trsumun@daum.net"];
+
   // 기본 Firebase 설정 — URL만 열면 자동 연결
   var DEFAULT_FB_CONFIG = {
     apiKey: "AIzaSyDzkdnSQqFNG9vG54CAaT8xTi6pJxl8mOQ",
@@ -1138,6 +1143,12 @@
       auth = firebase.auth();
 
       auth.onAuthStateChanged(function(user){
+        if(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) === -1){
+          // 허용되지 않은 구글 계정 — 로그인은 됐지만 운영자로 인정하지 않고 바로 로그아웃
+          showAdminLoginError("이 구글 계정(" + user.email + ")은 운영자로 등록되어 있지 않습니다.");
+          auth.signOut();
+          return;
+        }
         setAdminState(!!user, user);
       });
 
@@ -2539,29 +2550,19 @@
 
   document.getElementById("adminLoginBtn").addEventListener("click", function(){
     if(!auth) return;
-    var email = document.getElementById("adminEmail").value.trim();
-    var password = document.getElementById("adminPassword").value;
-    if(!email || !password){
-      showAdminLoginError("이메일과 비밀번호를 모두 입력해주세요.");
-      return;
-    }
     this.disabled = true;
     var btn = this;
-    auth.signInWithEmailAndPassword(email, password)
-      .then(function(){
-        document.getElementById("adminPassword").value = "";
-      })
+    var provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
       .catch(function(err){
         console.error("로그인 오류:", err);
-        var msg = "로그인에 실패했습니다. 이메일/비밀번호를 확인해주세요.";
-        if(err && (err.code === "auth/too-many-requests")) msg = "시도 횟수가 많아 잠시 후 다시 시도해주세요.";
+        if(err && err.code === "auth/popup-closed-by-user") return; // 사용자가 취소한 경우는 조용히 무시
+        var msg = "구글 로그인에 실패했습니다. 잠시 후 다시 시도해주세요.";
+        if(err && err.code === "auth/popup-blocked") msg = "팝업이 차단되었습니다. 브라우저의 팝업 차단을 해제해주세요.";
+        if(err && err.code === "auth/unauthorized-domain") msg = "이 도메인은 구글 로그인이 허용되지 않았습니다. Firebase 콘솔의 승인된 도메인 목록을 확인해주세요.";
         showAdminLoginError(msg);
       })
       .finally(function(){ btn.disabled = false; });
-  });
-
-  document.getElementById("adminPassword").addEventListener("keydown", function(e){
-    if(e.key === "Enter") document.getElementById("adminLoginBtn").click();
   });
 
   document.getElementById("adminLogoutBtn").addEventListener("click", function(){
