@@ -682,7 +682,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.02-5</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.02-6</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1165,10 +1165,12 @@
             state.members   = objToArray(data.members);
             state.rehearsals= objToArray(data.rehearsals);
             state.sample    = !!data.sample;
-            if(migrateData()) saveState();
+            // 데이터 정리(마이그레이션)는 관리자로 로그인된 세션에서만 저장 시도
+            // (비로그인 상태에서 저장을 시도하면 Database 규칙에 막혀 무한 재시도가 발생함)
+            if(migrateData() && auth && auth.currentUser) saveState();
           } else {
             seedSampleData();
-            saveState();
+            if(auth && auth.currentUser) saveState();
           }
         }catch(e){
           console.error("데이터 처리 오류:", e);
@@ -1234,6 +1236,11 @@
       el.textContent = "⚠️ 저장 실패 (재시도 중)";
       el.style.color = "#F4A4A4";
       el.style.display = "";
+    } else if(state === "denied"){
+      el.textContent = "⚠️ 저장 권한 없음 (운영자 로그인 필요)";
+      el.style.color = "#F4A4A4";
+      el.style.display = "";
+      updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 4000);
     }
   }
 
@@ -1260,9 +1267,15 @@
     }).catch(function(err){
       console.error("Firebase 쓰기 오류:", err);
       saveInFlight = false;
-      updateSaveIndicator("error");
-      // 실패 시 잠시 후 다시 시도
-      saveDebounceTimer = setTimeout(flushSaveState, 2000);
+      var denied = err && (err.code === "PERMISSION_DENIED" || /permission_denied/i.test(err.message||""));
+      if(denied){
+        // 권한 문제는 재시도해도 계속 실패하므로 무한 재시도하지 않음
+        updateSaveIndicator("denied");
+      } else {
+        updateSaveIndicator("error");
+        // 네트워크 등 일시적 오류로 보이는 경우에만 잠시 후 재시도
+        saveDebounceTimer = setTimeout(flushSaveState, 2000);
+      }
     });
   }
 
