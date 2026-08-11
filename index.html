@@ -549,8 +549,16 @@
 
 <div class="view-only-banner" id="viewOnlyBanner">
   🔒 지금은 조회 전용입니다. 연락처를 보려면
-  <button type="button" id="memberLoginBtn" class="btn-text" style="text-decoration:underline;">단원 로그인</button>
+  <button type="button" id="memberLoginToggleBtn" class="btn-text" style="text-decoration:underline;">단원 로그인</button>
   · 등록·수정하려면 화면 맨 아래 <b>운영자 메뉴</b>에서 로그인해주세요.
+  <form id="memberLoginForm" style="display:none;margin-top:8px;">
+    <input type="email" id="memberLoginEmailInput" placeholder="이메일" autocomplete="username" required
+      style="padding:6px 8px;border:1px solid var(--paper-line);border-radius:6px;font-size:12.5px;margin:2px;">
+    <input type="password" id="memberLoginPasswordInput" placeholder="비밀번호" autocomplete="current-password" required
+      style="padding:6px 8px;border:1px solid var(--paper-line);border-radius:6px;font-size:12.5px;margin:2px;">
+    <button type="submit" class="btn-secondary" style="font-size:12px;padding:6px 12px;margin:2px;">로그인</button>
+  </form>
+  <div id="memberLoginError" style="display:none;font-size:11.5px;color:var(--danger);margin-top:4px;"></div>
 </div>
 <div class="view-only-banner" id="memberLoggedInBanner" style="display:none;">
   🔓 <span id="memberLoginEmail"></span>로 로그인됨 · 연락처 열람 가능 (등록·수정은 운영자만 가능)
@@ -2623,6 +2631,8 @@
   function renderMemberBanner(isAdmin, user){
     var out = document.getElementById("viewOnlyBanner");
     var inBanner = document.getElementById("memberLoggedInBanner");
+    var loginForm = document.getElementById("memberLoginForm");
+    var loginErr = document.getElementById("memberLoginError");
     if(isAdmin){
       if(out) out.style.display = "none";
       if(inBanner) inBanner.style.display = "none";
@@ -2635,9 +2645,13 @@
         var emailEl = document.getElementById("memberLoginEmail");
         if(emailEl) emailEl.textContent = user.email;
       }
+      if(loginForm){ loginForm.style.display = "none"; loginForm.reset(); }
+      if(loginErr){ loginErr.style.display = "none"; loginErr.textContent = ""; }
     } else {
       if(out) out.style.display = "block";
       if(inBanner) inBanner.style.display = "none";
+      if(loginForm) loginForm.style.display = "none";
+      if(loginErr){ loginErr.style.display = "none"; loginErr.textContent = ""; }
     }
   }
 
@@ -2666,7 +2680,44 @@
   }
 
   document.getElementById("adminLoginBtn").addEventListener("click", function(){ doGoogleLogin(this); });
-  document.getElementById("memberLoginBtn").addEventListener("click", function(){ doGoogleLogin(this); });
+
+  // 단원 로그인: 구글 계정이 아니라, 운영자가 Firebase 콘솔에서 미리 만들어준
+  // 이메일/비밀번호 계정으로만 로그인 (누구나 아무 구글 계정으로 들어오는 것을 막기 위함)
+  document.getElementById("memberLoginToggleBtn").addEventListener("click", function(){
+    var form = document.getElementById("memberLoginForm");
+    var open = form.style.display !== "none";
+    form.style.display = open ? "none" : "block";
+    if(!open) document.getElementById("memberLoginEmailInput").focus();
+  });
+
+  document.getElementById("memberLoginForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    if(!auth) return;
+    var errEl = document.getElementById("memberLoginError");
+    errEl.style.display = "none"; errEl.textContent = "";
+    var email = document.getElementById("memberLoginEmailInput").value.trim();
+    var password = document.getElementById("memberLoginPasswordInput").value;
+    var submitBtn = e.target.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    auth.signInWithEmailAndPassword(email, password)
+      .then(function(){
+        document.getElementById("memberLoginPasswordInput").value = "";
+      })
+      .catch(function(err){
+        console.error("단원 로그인 오류:", err);
+        var msg = "로그인에 실패했습니다. 이메일/비밀번호를 확인해주세요.";
+        if(err && (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential")){
+          msg = "이메일 또는 비밀번호가 올바르지 않습니다.";
+        } else if(err && err.code === "auth/too-many-requests"){
+          msg = "너무 많이 시도했습니다. 잠시 후 다시 시도해주세요.";
+        } else if(err && err.code === "auth/invalid-email"){
+          msg = "이메일 형식이 올바르지 않습니다.";
+        }
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+      })
+      .finally(function(){ submitBtn.disabled = false; });
+  });
 
   document.getElementById("adminLogoutBtn").addEventListener("click", function(){
     if(auth) auth.signOut();
