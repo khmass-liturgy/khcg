@@ -548,7 +548,13 @@
 </div>
 
 <div class="view-only-banner" id="viewOnlyBanner">
-  🔒 지금은 조회 전용입니다. 등록·수정하려면 화면 맨 아래 <b>운영자 메뉴</b>에서 로그인해주세요.
+  🔒 지금은 조회 전용입니다. 연락처를 보려면
+  <button type="button" id="memberLoginBtn" class="btn-text" style="text-decoration:underline;">단원 로그인</button>
+  · 등록·수정하려면 화면 맨 아래 <b>운영자 메뉴</b>에서 로그인해주세요.
+</div>
+<div class="view-only-banner" id="memberLoggedInBanner" style="display:none;">
+  🔓 <span id="memberLoginEmail"></span>로 로그인됨 · 연락처 열람 가능 (등록·수정은 운영자만 가능)
+  <button type="button" id="memberLogoutBtn" class="btn-text" style="text-decoration:underline;">로그아웃</button>
 </div>
 
 <div class="wrap">
@@ -1194,13 +1200,10 @@
       auth.onAuthStateChanged(function(user){
         // 연락처 열람 권한은 관리자 여부와 무관하게 "구글 인증 여부"만 따른다 (DB 규칙과 동일한 기준)
         attachPhonesListener(!!user);
-        if(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) === -1){
-          // 허용되지 않은 구글 계정 — 로그인은 됐지만 운영자로 인정하지 않고 바로 로그아웃
-          showAdminLoginError("이 구글 계정(" + user.email + ")은 운영자로 등록되어 있지 않습니다.");
-          auth.signOut();
-          return;
-        }
-        setAdminState(!!user, user);
+        // 쓰기·설정 권한은 ADMIN_EMAILS에 등록된 계정만. 그 외 구글 계정은 로그아웃시키지 않고
+        // "단원" 상태로 유지해 연락처만 볼 수 있게 한다 (실제 쓰기 차단은 Database 규칙이 담당).
+        var isAdmin = !!(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) !== -1);
+        setAdminState(isAdmin, user);
       });
 
       db.ref(".info/connected").on("value", function(snap){
@@ -2599,9 +2602,10 @@
   });
 
   /* ============================================================
-     운영자 로그인 (Firebase Authentication)
-     - 조회(읽기)는 누구나 가능, 등록/수정/삭제(쓰기)는 로그인한 운영자만 가능
-     - 계정은 앱에서 만들 수 없고 Firebase 콘솔 > Authentication에서 미리 만들어둔 계정으로만 로그인
+     구글 로그인 (Firebase Authentication)
+     - 조회(읽기)는 누구나 가능
+     - 구글 계정으로 로그인한 사람(단원 포함 누구나)은 연락처를 볼 수 있음
+     - 등록/수정/삭제(쓰기)와 DB 설정/내보내기/가져오기는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
   ============================================================ */
   function setAdminState(isAdmin, user){
     document.body.classList.toggle("is-admin", isAdmin);
@@ -2613,6 +2617,28 @@
     if(label) label.textContent = isAdmin && user ? ("👤 " + user.email) : "";
     var errEl = document.getElementById("adminLoginError");
     if(errEl){ errEl.style.display = "none"; errEl.textContent = ""; }
+    renderMemberBanner(isAdmin, user);
+  }
+
+  function renderMemberBanner(isAdmin, user){
+    var out = document.getElementById("viewOnlyBanner");
+    var inBanner = document.getElementById("memberLoggedInBanner");
+    if(isAdmin){
+      if(out) out.style.display = "none";
+      if(inBanner) inBanner.style.display = "none";
+      return;
+    }
+    if(user){
+      if(out) out.style.display = "none";
+      if(inBanner){
+        inBanner.style.display = "block";
+        var emailEl = document.getElementById("memberLoginEmail");
+        if(emailEl) emailEl.textContent = user.email;
+      }
+    } else {
+      if(out) out.style.display = "block";
+      if(inBanner) inBanner.style.display = "none";
+    }
   }
 
   function showAdminLoginError(message){
@@ -2622,10 +2648,9 @@
     errEl.style.display = "block";
   }
 
-  document.getElementById("adminLoginBtn").addEventListener("click", function(){
+  function doGoogleLogin(btn){
     if(!auth) return;
-    this.disabled = true;
-    var btn = this;
+    if(btn) btn.disabled = true;
     var provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider)
       .catch(function(err){
@@ -2635,11 +2660,18 @@
         if(err && err.code === "auth/popup-blocked") msg = "팝업이 차단되었습니다. 브라우저의 팝업 차단을 해제해주세요.";
         if(err && err.code === "auth/unauthorized-domain") msg = "이 도메인은 구글 로그인이 허용되지 않았습니다. Firebase 콘솔의 승인된 도메인 목록을 확인해주세요.";
         showAdminLoginError(msg);
+        alert(msg);
       })
-      .finally(function(){ btn.disabled = false; });
-  });
+      .finally(function(){ if(btn) btn.disabled = false; });
+  }
+
+  document.getElementById("adminLoginBtn").addEventListener("click", function(){ doGoogleLogin(this); });
+  document.getElementById("memberLoginBtn").addEventListener("click", function(){ doGoogleLogin(this); });
 
   document.getElementById("adminLogoutBtn").addEventListener("click", function(){
+    if(auth) auth.signOut();
+  });
+  document.getElementById("memberLogoutBtn").addEventListener("click", function(){
     if(auth) auth.signOut();
   });
 
