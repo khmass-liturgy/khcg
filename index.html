@@ -960,6 +960,7 @@
   ============================================================ */
   var FB_CONFIG_KEY = "gyoha_firebase_config_v1";
   var DB_PATH = "gyoha-guitar";
+  var PHONES_PATH = "gyoha-guitar-phones"; // gyoha-guitar와 형제(최상위) 경로 — 부모 노드에 종속되면 안 됨
   var db = null;
   var auth = null;
   var phonesRef = null;
@@ -1161,7 +1162,7 @@
       renderMembers();
       return;
     }
-    phonesRef = db.ref(DB_PATH + "/memberPhones");
+    phonesRef = db.ref(PHONES_PATH);
     phonesRef.on("value", function(snap){
       memberPhonesMap = snap.val() || {};
       mergeMemberPhones();
@@ -1308,13 +1309,15 @@
     if(saveInFlight){ saveQueuedAgain = true; return; }
     saveInFlight = true;
     updateSaveIndicator("saving");
-    db.ref(DB_PATH).set({
-      scores:       arrayToObj(state.scores),
-      members:      membersPublicObj(),
-      memberPhones: memberPhonesObj(),
-      rehearsals:   arrayToObj(state.rehearsals),
-      sample:       !!state.sample
-    }).then(function(){
+    Promise.all([
+      db.ref(DB_PATH).set({
+        scores:     arrayToObj(state.scores),
+        members:    membersPublicObj(),
+        rehearsals: arrayToObj(state.rehearsals),
+        sample:     !!state.sample
+      }),
+      db.ref(PHONES_PATH).set(memberPhonesObj())
+    ]).then(function(){
       saveInFlight = false;
       if(saveQueuedAgain){
         saveQueuedAgain = false;
