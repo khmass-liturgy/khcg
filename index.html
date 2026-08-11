@@ -962,6 +962,8 @@
   var DB_PATH = "gyoha-guitar";
   var db = null;
   var auth = null;
+  var phonesRef = null;
+  var memberPhonesMap = {};
 
   // 운영자로 인정할 구글 계정 이메일 목록 — 여기 없는 계정은 구글 로그인은 되어도 쓰기 권한이 없습니다.
   // (실제 쓰기 권한은 Firebase Realtime Database 규칙에서도 동일하게 검사해야 합니다 — 아래 안내 참고)
@@ -1127,6 +1129,51 @@
     return Object.keys(obj).map(function(k){ return obj[k]; });
   }
 
+  // 연락처(phone)는 별도 경로(memberPhones)에 저장하고, Database 규칙에서
+  // "auth != null"(구글 인증한 사람)에게만 읽기를 허용한다. 그 외 필드는 공개.
+  function membersPublicObj(){
+    var obj = {};
+    (state.members||[]).forEach(function(m){
+      if(!m || !m.id) return;
+      var copy = {};
+      Object.keys(m).forEach(function(k){ if(k !== "phone") copy[k] = m[k]; });
+      obj[m.id] = copy;
+    });
+    return obj;
+  }
+  function memberPhonesObj(){
+    var obj = {};
+    (state.members||[]).forEach(function(m){
+      if(m && m.id) obj[m.id] = m.phone || "";
+    });
+    return obj;
+  }
+  function mergeMemberPhones(){
+    state.members.forEach(function(m){
+      if(m && m.id) m.phone = memberPhonesMap[m.id] || "";
+    });
+  }
+  function attachPhonesListener(isAuthed){
+    if(phonesRef){ phonesRef.off(); phonesRef = null; }
+    if(!db || !isAuthed){
+      memberPhonesMap = {};
+      mergeMemberPhones();
+      renderMembers();
+      return;
+    }
+    phonesRef = db.ref(DB_PATH + "/memberPhones");
+    phonesRef.on("value", function(snap){
+      memberPhonesMap = snap.val() || {};
+      mergeMemberPhones();
+      renderMembers();
+    }, function(err){
+      console.error("연락처 읽기 오류:", err);
+      memberPhonesMap = {};
+      mergeMemberPhones();
+      renderMembers();
+    });
+  }
+
   function setStatus(status){
     var el = document.getElementById("connectionStatus");
     if(!el) return;
@@ -1141,8 +1188,11 @@
       firebase.initializeApp(config);
       db = firebase.database();
       auth = firebase.auth();
+      phonesRef = null;
 
       auth.onAuthStateChanged(function(user){
+        // 연락처 열람 권한은 관리자 여부와 무관하게 "구글 인증 여부"만 따른다 (DB 규칙과 동일한 기준)
+        attachPhonesListener(!!user);
         if(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) === -1){
           // 허용되지 않은 구글 계정 — 로그인은 됐지만 운영자로 인정하지 않고 바로 로그아웃
           showAdminLoginError("이 구글 계정(" + user.email + ")은 운영자로 등록되어 있지 않습니다.");
@@ -1167,7 +1217,13 @@
             state.sample    = !!data.sample;
             // 데이터 정리(마이그레이션)는 관리자로 로그인된 세션에서만 저장 시도
             // (비로그인 상태에서 저장을 시도하면 Database 규칙에 막혀 무한 재시도가 발생함)
-            if(migrateData() && auth && auth.currentUser) saveState();
+            var needsMigration = migrateData();
+            // 이전 구조: phone이 members/{id} 안에 그대로 저장되어 있어 공개 읽기로 노출됨.
+            // 관리자가 로그인하면 한 번 재저장해서 phone을 memberPhones로 분리 이전한다.
+            var legacyPhoneEmbedded = data.members && Object.keys(data.members).some(function(k){
+              return data.members[k] && Object.prototype.hasOwnProperty.call(data.members[k], "phone");
+            });
+            if((needsMigration || legacyPhoneEmbedded) && auth && auth.currentUser) saveState();
           } else {
             seedSampleData();
             if(auth && auth.currentUser) saveState();
@@ -1175,6 +1231,7 @@
         }catch(e){
           console.error("데이터 처리 오류:", e);
         }
+        mergeMemberPhones();
         rendered = true;
         renderAll();
       }, function(err){
@@ -1252,10 +1309,11 @@
     saveInFlight = true;
     updateSaveIndicator("saving");
     db.ref(DB_PATH).set({
-      scores:     arrayToObj(state.scores),
-      members:    arrayToObj(state.members),
-      rehearsals: arrayToObj(state.rehearsals),
-      sample:     !!state.sample
+      scores:       arrayToObj(state.scores),
+      members:      membersPublicObj(),
+      memberPhones: memberPhonesObj(),
+      rehearsals:   arrayToObj(state.rehearsals),
+      sample:       !!state.sample
     }).then(function(){
       saveInFlight = false;
       if(saveQueuedAgain){
