@@ -979,6 +979,9 @@
   var auth = null;
   var phonesRef = null;
   var memberPhonesMap = {};
+  // 연락처를 실제로 읽어온 적이 있는지. false면 memberPhonesMap이 "비어 있음"이 아니라
+  // "아직 모름"이라는 뜻이므로, 이 상태로 저장하면 기존 연락처를 빈 값으로 덮어쓰게 된다.
+  var phonesLoaded = false;
 
   // 운영자로 인정할 구글 계정 이메일 목록 — 여기 없는 계정은 구글 로그인은 되어도 쓰기 권한이 없습니다.
   // (실제 쓰기 권한은 Firebase Realtime Database 규칙에서도 동일하게 검사해야 합니다 — 아래 안내 참고)
@@ -1172,6 +1175,7 @@
     if(phonesRef){ phonesRef.off(); phonesRef = null; }
     if(!db || !isAuthed){
       memberPhonesMap = {};
+      phonesLoaded = false;
       mergeMemberPhones();
       renderMembers();
       return;
@@ -1179,11 +1183,13 @@
     phonesRef = db.ref(PHONES_PATH);
     phonesRef.on("value", function(snap){
       memberPhonesMap = snap.val() || {};
+      phonesLoaded = true;
       mergeMemberPhones();
       renderMembers();
     }, function(err){
       console.error("연락처 읽기 오류:", err);
       memberPhonesMap = {};
+      phonesLoaded = false;
       mergeMemberPhones();
       renderMembers();
     });
@@ -1231,19 +1237,27 @@
             // (비로그인 상태에서 저장을 시도하면 Database 규칙에 막혀 무한 재시도가 발생함)
             var needsMigration = migrateData();
             // 이전 구조: phone이 members/{id} 안에 그대로 저장되어 있어 공개 읽기로 노출됨.
-            // 관리자가 로그인하면 한 번 재저장해서 phone을 memberPhones로 분리 이전한다.
-            var legacyPhoneEmbedded = data.members && Object.keys(data.members).some(function(k){
-              return data.members[k] && Object.prototype.hasOwnProperty.call(data.members[k], "phone");
+            // 분리 이전 시, 값을 memberPhonesMap으로 먼저 옮겨두지 않으면
+            // 아래 mergeMemberPhones()에서 번호가 빈 값으로 덮여 유실된다.
+            var legacyPhoneEmbedded = false;
+            state.members.forEach(function(m){
+              if(!m || !Object.prototype.hasOwnProperty.call(m, "phone")) return;
+              legacyPhoneEmbedded = true;
+              if(m.phone && !memberPhonesMap[m.id]){
+                memberPhonesMap[m.id] = m.phone;
+                phonesLoaded = true;
+              }
             });
+            mergeMemberPhones();
             if((needsMigration || legacyPhoneEmbedded) && auth && auth.currentUser) saveState();
           } else {
             seedSampleData();
+            mergeMemberPhones();
             if(auth && auth.currentUser) saveState();
           }
         }catch(e){
           console.error("데이터 처리 오류:", e);
         }
-        mergeMemberPhones();
         rendered = true;
         renderAll();
       }, function(err){
@@ -1320,15 +1334,17 @@
     if(saveInFlight){ saveQueuedAgain = true; return; }
     saveInFlight = true;
     updateSaveIndicator("saving");
-    Promise.all([
+    var writes = [
       db.ref(DB_PATH).set({
         scores:     arrayToObj(state.scores),
         members:    membersPublicObj(),
         rehearsals: arrayToObj(state.rehearsals),
         sample:     !!state.sample
-      }),
-      db.ref(PHONES_PATH).set(memberPhonesObj())
-    ]).then(function(){
+      })
+    ];
+    // 연락처를 아직 읽어오지 못한 상태에서 저장하면 기존 번호가 전부 지워지므로 건드리지 않는다
+    if(phonesLoaded) writes.push(db.ref(PHONES_PATH).set(memberPhonesObj()));
+    Promise.all(writes).then(function(){
       saveInFlight = false;
       if(saveQueuedAgain){
         saveQueuedAgain = false;
