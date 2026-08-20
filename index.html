@@ -1283,20 +1283,12 @@
   var saveInFlight = false;
   var saveQueuedAgain = false;
 
+  // 정상 저장(저장 중·저장됨)은 표시하지 않고, 저장이 실패했을 때만 알린다
   function updateSaveIndicator(state){
     var el = document.getElementById("saveIndicator");
     if(!el) return;
     clearTimeout(updateSaveIndicator._hideTimer);
-    if(state === "pending" || state === "saving"){
-      el.textContent = "💾 저장 중…";
-      el.style.color = "#E3D5BA";
-      el.style.display = "";
-    } else if(state === "saved"){
-      el.textContent = "✅ 저장됨";
-      el.style.color = "#9DE0A0";
-      el.style.display = "";
-      updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 1400);
-    } else if(state === "error"){
+    if(state === "error"){
       el.textContent = "⚠️ 저장 실패 (재시도 중)";
       el.style.color = "#F4A4A4";
       el.style.display = "";
@@ -1305,6 +1297,9 @@
       el.style.color = "#F4A4A4";
       el.style.display = "";
       updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 4000);
+    } else {
+      // pending / saving / saved — 조용히 숨김 (이전 오류 표시도 함께 사라짐)
+      el.style.display = "none";
     }
   }
 
