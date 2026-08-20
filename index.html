@@ -471,15 +471,12 @@
 
   .delete-confirm p{ font-size:14px; color:var(--ink-soft); }
 
-  /* ---------- 연결 상태 ---------- */
+  /* ---------- 저장 상태 표시 ---------- */
   .conn-badge{
     display:inline-flex; align-items:center; gap:5px;
     font-size:12.5px; color:#E3D5BA; padding:8px 10px;
     white-space:nowrap; flex:0 0 auto;
   }
-  .conn-badge[data-status="online"]{ color:#9DE0A0; }
-  .conn-badge[data-status="offline"]{ color:#F4A4A4; }
-  .conn-badge[data-status="connecting"]{ color:#E3D5BA; }
 
   footer.app-footer{
     text-align:center; padding:30px 20px 50px; color:var(--ink-faint); font-size:12px;
@@ -519,7 +516,6 @@
       <p>합주 악보 관리 — 악보, 단원, 연습 일정을 한곳에서 관리합니다</p>
     </div>
     <div class="header-actions">
-      <span id="connectionStatus" class="conn-badge">⏳ 연결 중…</span>
       <span id="saveIndicator" class="conn-badge" style="display:none;"></span>
       <button class="btn-ghost-dark" id="installBtn" type="button">📲 홈화면 추가</button>
       <input type="file" id="importFile" accept="application/json" hidden>
@@ -1195,15 +1191,6 @@
     });
   }
 
-  function setStatus(status){
-    var el = document.getElementById("connectionStatus");
-    if(!el) return;
-    var map = { online:["🟢","연결됨"], offline:["🔴","오프라인"], connecting:["⏳","연결 중…"] };
-    var info = map[status] || map.connecting;
-    el.textContent = info[0] + " " + info[1];
-    el.dataset.status = status;
-  }
-
   function doInitFirebase(config){
     try{
       firebase.initializeApp(config);
@@ -1218,10 +1205,6 @@
         // "단원" 상태로 유지해 연락처만 볼 수 있게 한다 (실제 쓰기 차단은 Database 규칙이 담당).
         var isAdmin = !!(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) !== -1);
         setAdminState(isAdmin, user);
-      });
-
-      db.ref(".info/connected").on("value", function(snap){
-        setStatus(snap.val() ? "online" : "offline");
       });
 
       var rendered = false;
@@ -1262,7 +1245,6 @@
         renderAll();
       }, function(err){
         console.error("Firebase 읽기 오류:", err);
-        setStatus("offline");
         if(!rendered){ rendered = true; renderAll(); }
       });
 
@@ -1291,7 +1273,6 @@
   }
 
   function loadState(){
-    setStatus("connecting");
     // 항상 코드에 내장된 기본 설정으로 연결 (localStorage 무시)
     localStorage.removeItem(FB_CONFIG_KEY);
     initFirebase(DEFAULT_FB_CONFIG);
