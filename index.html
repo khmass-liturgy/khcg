@@ -168,6 +168,7 @@
   body:not(.is-admin) #addScoreBtn,
   body:not(.is-admin) #addMemberBtn,
   body:not(.is-admin) #addRehearsalBtn,
+  body:not(.is-admin) #bulkRehearsalBtn,
   body:not(.is-admin) #clearSampleBtn,
   body:not(.is-admin) .score-actions,
   body:not(.is-admin) .member-actions,
@@ -637,7 +638,10 @@
   <section id="tab-rehearsals">
     <div class="section-head">
       <h2>연습(수업) 일정 <span class="count" id="rehearsalCount"></span></h2>
-      <button class="btn-primary" id="addRehearsalBtn" type="button">+ 일정 추가</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-secondary" id="bulkRehearsalBtn" type="button">🗓 목요일 일괄 추가</button>
+        <button class="btn-primary" id="addRehearsalBtn" type="button">+ 일정 추가</button>
+      </div>
     </div>
     <div id="nextRehearsal"></div>
     <div id="rehearsalList" class="rehearsal-list"></div>
@@ -873,6 +877,38 @@
   </div>
 </div>
 
+<!-- ===================== 목요일 일괄 추가 모달 ===================== -->
+<div class="modal-overlay" id="bulkRehearsalModalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>🗓 매주 목요일 일정 한번에 만들기</h2>
+      <button type="button" class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">
+        빠진 목요일만 새로 만듭니다. <b>이미 등록된 일정(휴강 포함)은 건드리지 않습니다.</b><br>
+        연습곡·메모는 비워둔 채로 만들어지니, 만든 뒤 각 일정을 수정해서 채우세요.
+      </p>
+      <div class="field" style="margin-bottom:14px;">
+        <label>몇 주치를 만들까요?</label>
+        <div class="chip-group" id="bulkWeekChips">
+          <button type="button" class="chip" data-weeks="4">4주</button>
+          <button type="button" class="chip active" data-weeks="8">8주</button>
+          <button type="button" class="chip" data-weeks="12">12주</button>
+        </div>
+      </div>
+      <div style="font-size:12.5px; color:var(--ink-faint); margin-bottom:12px;">
+        새로 만드는 일정은 모두 <b>목요일 저녁 8:10 · 교하성당 마테오방</b>으로 등록됩니다.
+      </div>
+      <div id="bulkPreview" style="max-height:260px; overflow-y:auto; border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; background:var(--paper);"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" data-close>취소</button>
+      <button type="button" class="btn-primary" id="bulkConfirmBtn">추가</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== 삭제 확인 모달 ===================== -->
 <div class="modal-overlay" id="confirmModalOverlay">
   <div class="modal" style="max-width:380px;">
@@ -978,6 +1014,9 @@
   // 연락처를 실제로 읽어온 적이 있는지. false면 memberPhonesMap이 "비어 있음"이 아니라
   // "아직 모름"이라는 뜻이므로, 이 상태로 저장하면 기존 연락처를 빈 값으로 덮어쓰게 된다.
   var phonesLoaded = false;
+  // 본 데이터(악보·단원·일정)를 실제로 읽어온 적이 있는지. 읽기가 느리거나 실패해도 화면은
+  // 빈 상태로 그려지는데, 그때 저장하면 비어 있는 state로 DB 전체를 덮어쓰게 된다.
+  var dataLoaded = false;
 
   // 운영자로 인정할 구글 계정 이메일 목록 — 여기 없는 계정은 구글 로그인은 되어도 쓰기 권한이 없습니다.
   // (실제 쓰기 권한은 Firebase Realtime Database 규칙에서도 동일하게 검사해야 합니다 — 아래 안내 참고)
@@ -1211,6 +1250,9 @@
       db.ref(DB_PATH).on("value", function(snapshot){
         try{
           var data = snapshot.val();
+          // 스냅샷이 도착했다는 것은 DB의 현재 상태를 알게 됐다는 뜻 (data가 null이면 빈 DB).
+          // 이 시점 이후로만 저장을 허용한다.
+          dataLoaded = true;
           if(data){
             state.scores    = objToArray(data.scores);
             state.members   = objToArray(data.members);
@@ -1292,6 +1334,10 @@
       el.textContent = "⚠️ 저장 실패 (재시도 중)";
       el.style.color = "#F4A4A4";
       el.style.display = "";
+    } else if(state === "notloaded"){
+      el.textContent = "⚠️ 자료를 불러오지 못해 저장할 수 없습니다. 새로고침 해주세요.";
+      el.style.color = "#F4A4A4";
+      el.style.display = "";
     } else if(state === "denied"){
       el.textContent = "⚠️ 저장 권한 없음 (운영자 로그인 필요)";
       el.style.color = "#F4A4A4";
@@ -1305,6 +1351,13 @@
 
   function flushSaveState(){
     if(!db) return;
+    // 아직 한 번도 읽어오지 못했다면 state는 "비어 있음"이 아니라 "모름"이다.
+    // 이 상태로 쓰면 악보·단원·일정이 통째로 지워지므로 저장하지 않는다.
+    if(!dataLoaded){
+      console.warn("데이터를 아직 불러오지 못해 저장을 건너뜁니다.");
+      updateSaveIndicator("notloaded");
+      return;
+    }
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
     if(saveInFlight){ saveQueuedAgain = true; return; }
@@ -2399,6 +2452,131 @@
   }
   document.getElementById("rehearsalDate").addEventListener("input", updateDateHint);
   document.getElementById("addRehearsalBtn").addEventListener("click", function(){ openRehearsalModal(null); });
+
+  /* ============================================================
+     목요일 일정 일괄 추가
+     - 빠진 목요일만 새로 만들고, 이미 있는 날짜는 읽기만 할 뿐 절대 수정/삭제하지 않는다
+     - 중복 판정은 날짜 문자열만으로 한다 (시간·장소·휴강 여부는 보지 않음)
+  ============================================================ */
+  var BULK_DEFAULT_WEEKS = 8;
+  var bulkWeeks = BULK_DEFAULT_WEEKS;
+
+  // 앞으로 n주간의 목요일을 만들고, 각 날짜가 이미 등록돼 있는지 함께 돌려준다
+  function bulkThursdayPlan(weeks){
+    var plan = [];
+    var d = nextThursday(todayISO());
+    for(var i = 0; i < weeks; i++){
+      var iso = addDays(d, i * 7);
+      var existing = null;
+      for(var j = 0; j < state.rehearsals.length; j++){
+        var r = state.rehearsals[j];
+        if(r && String(r.date || "").trim() === iso){ existing = r; break; }
+      }
+      plan.push({ date: iso, existing: existing });
+    }
+    return plan;
+  }
+
+  function bulkSkipReason(r){
+    if(r.cancelled) return "🚫 휴강으로 등록됨";
+    if(r.sample) return "샘플 일정";
+    return "이미 등록됨";
+  }
+
+  function renderBulkPreview(){
+    var plan = bulkThursdayPlan(bulkWeeks);
+    var toAdd = plan.filter(function(p){ return !p.existing; });
+    var toSkip = plan.filter(function(p){ return p.existing; });
+    var html = "";
+
+    if(toAdd.length){
+      html += '<div style="font-size:12px;font-weight:700;color:var(--wood);margin-bottom:6px;">새로 만들 날짜 ('+toAdd.length+'개)</div>';
+      html += toAdd.map(function(p){
+        return '<div style="font-size:13.5px;padding:3px 0;">🟢 '+escapeHtml(formatDateFull(p.date))+'</div>';
+      }).join("");
+    } else {
+      html += '<div style="font-size:13.5px;color:var(--ink-soft);">추가할 새 날짜가 없습니다. 이미 모두 등록되어 있어요.</div>';
+    }
+
+    if(toSkip.length){
+      html += '<div style="font-size:12px;font-weight:700;color:var(--wood);margin:12px 0 6px;">그대로 둘 날짜 ('+toSkip.length+'개)</div>';
+      html += toSkip.map(function(p){
+        return '<div style="font-size:13px;padding:3px 0;color:var(--ink-faint);">— '+
+          escapeHtml(formatDateFull(p.date))+' · '+escapeHtml(bulkSkipReason(p.existing))+'</div>';
+      }).join("");
+    }
+
+    document.getElementById("bulkPreview").innerHTML = html;
+    var btn = document.getElementById("bulkConfirmBtn");
+    btn.textContent = toAdd.length ? (toAdd.length + "개 추가") : "추가";
+    btn.disabled = toAdd.length === 0;
+    btn.style.opacity = toAdd.length ? "" : ".5";
+  }
+
+  document.getElementById("bulkWeekChips").addEventListener("click", function(e){
+    var chip = e.target.closest(".chip");
+    if(!chip) return;
+    this.querySelectorAll(".chip").forEach(function(c){ c.classList.remove("active"); });
+    chip.classList.add("active");
+    bulkWeeks = parseInt(chip.dataset.weeks, 10) || BULK_DEFAULT_WEEKS;
+    renderBulkPreview();
+  });
+
+  document.getElementById("bulkRehearsalBtn").addEventListener("click", function(){
+    if(!db || !dataLoaded){
+      alert("자료를 아직 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      return;
+    }
+    bulkWeeks = BULK_DEFAULT_WEEKS;
+    document.querySelectorAll("#bulkWeekChips .chip").forEach(function(c){
+      c.classList.toggle("active", parseInt(c.dataset.weeks, 10) === BULK_DEFAULT_WEEKS);
+    });
+    renderBulkPreview();
+    openModal("bulkRehearsalModalOverlay");
+  });
+
+  document.getElementById("bulkConfirmBtn").addEventListener("click", function(){
+    if(!db || !dataLoaded){
+      alert("자료를 아직 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.");
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+
+    // 미리보기 시점이 아니라 "지금" 상태로 다시 계산한다 (그 사이 다른 기기에서 추가됐을 수 있음)
+    var toAdd = bulkThursdayPlan(bulkWeeks).filter(function(p){ return !p.existing; });
+    if(!toAdd.length){
+      closeModal("bulkRehearsalModalOverlay");
+      alert("추가할 새 날짜가 없습니다. 이미 모두 등록되어 있습니다.");
+      return;
+    }
+
+    // id 중복은 arrayToObj에서 조용히 한 건을 덮어쓰므로 미리 걸러낸다
+    var usedIds = {};
+    state.rehearsals.forEach(function(r){ if(r && r.id) usedIds[r.id] = true; });
+    toAdd.forEach(function(p){
+      var id = uid();
+      while(usedIds[id]) id = uid();
+      usedIds[id] = true;
+      state.rehearsals.push({
+        id: id,
+        date: p.date,
+        time: FIXED_REHEARSAL_TIME,
+        location: "교하성당 마테오방",
+        pieceIds: [],
+        memo: "",
+        cancelled: false,
+        cancelReason: "",
+        sample: false
+      });
+    });
+
+    saveState();
+    closeModal("bulkRehearsalModalOverlay");
+    renderRehearsals();
+    renderAttendancePage();
+    alert(toAdd.length + "개의 목요일 일정을 추가했습니다.\n연습곡과 메모는 각 일정을 수정해서 채워주세요.");
+  });
 
   document.getElementById("rehearsalForm").addEventListener("submit", function(e){
     e.preventDefault();
