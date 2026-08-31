@@ -435,8 +435,12 @@
   .recital-entry-rows{ display:flex; flex-direction:column; gap:8px; }
   .recital-entry-row{ display:grid; grid-template-columns:minmax(120px,.85fr) minmax(140px,1.4fr) auto; gap:7px; align-items:center; }
   .recital-entry-row select,.recital-entry-row input{ border:1px solid var(--paper-line); border-radius:9px; padding:9px 10px; font:inherit; min-width:0; }
-  .recital-entry-row .btn-remove-entry{ border:0; background:none; color:var(--danger); cursor:pointer; font-size:18px; padding:6px; }
-  @media (max-width:520px){ .recital-entry-row{ grid-template-columns:1fr auto; } .recital-entry-row input{ grid-column:1; } .recital-entry-row .btn-remove-entry{ grid-column:2; grid-row:1 / span 2; } }
+  .recital-entry-controls{ display:flex; gap:2px; align-items:center; }
+  .recital-entry-controls button{ border:0; background:none; cursor:pointer; font-size:16px; padding:6px; line-height:1; }
+  .recital-entry-controls .btn-move-entry{ color:var(--wood); }
+  .recital-entry-controls .btn-move-entry:disabled{ color:var(--paper-line); cursor:default; }
+  .recital-entry-controls .btn-remove-entry{ color:var(--danger); font-size:18px; }
+  @media (max-width:520px){ .recital-entry-row{ grid-template-columns:1fr auto; } .recital-entry-row input{ grid-column:1; } .recital-entry-controls{ grid-column:2; grid-row:1 / span 2; flex-direction:column; } }
 
   /* ---------- stats ---------- */
   .stat-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px; }
@@ -756,7 +760,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-8</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-9</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2483,18 +2487,32 @@
     return '<div class="recital-entry-row" data-existing-name="'+escapeHtml(performance.presenter || "")+'">'+
       '<select class="recital-entry-member" aria-label="발표자">'+options.join("")+'</select>'+
       '<input type="text" class="recital-entry-piece" maxlength="160" aria-label="발표곡" placeholder="발표곡" value="'+escapeHtml(performance.piece || "")+'">'+
-      '<button type="button" class="btn-remove-entry" title="이 발표자 삭제" aria-label="이 발표자 삭제">×</button>'+
+      '<div class="recital-entry-controls">'+
+        '<button type="button" class="btn-move-entry" data-move-entry="up" title="위로 이동" aria-label="위로 이동">▲</button>'+
+        '<button type="button" class="btn-move-entry" data-move-entry="down" title="아래로 이동" aria-label="아래로 이동">▼</button>'+
+        '<button type="button" class="btn-remove-entry" title="이 발표자 삭제" aria-label="이 발표자 삭제">×</button>'+
+      '</div>'+
     '</div>';
+  }
+
+  function updateMonthlyRecitalPerformanceControls(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll("#monthlyRecitalPerformanceRows .recital-entry-row"));
+    rows.forEach(function(row, index){
+      row.querySelector('[data-move-entry="up"]').disabled = index === 0;
+      row.querySelector('[data-move-entry="down"]').disabled = index === rows.length - 1;
+    });
   }
 
   function renderMonthlyRecitalPerformanceRows(recital){
     var performances = monthlyRecitalPerformances(recital);
     var box = document.getElementById("monthlyRecitalPerformanceRows");
     box.innerHTML = (performances.length ? performances : [{}]).map(monthlyRecitalPerformanceRowHtml).join("");
+    updateMonthlyRecitalPerformanceControls();
   }
 
   function addMonthlyRecitalPerformanceRow(performance){
     document.getElementById("monthlyRecitalPerformanceRows").insertAdjacentHTML("beforeend", monthlyRecitalPerformanceRowHtml(performance));
+    updateMonthlyRecitalPerformanceControls();
   }
 
   function monthlyRecitalPerformancesFromRows(){
@@ -2541,6 +2559,18 @@
   });
 
   document.getElementById("monthlyRecitalPerformanceRows").addEventListener("click", function(e){
+    var moveBtn = e.target.closest("[data-move-entry]");
+    if(moveBtn && !moveBtn.disabled){
+      var moveRow = moveBtn.closest(".recital-entry-row");
+      if(moveBtn.dataset.moveEntry === "up" && moveRow.previousElementSibling){
+        moveRow.parentNode.insertBefore(moveRow, moveRow.previousElementSibling);
+      }
+      if(moveBtn.dataset.moveEntry === "down" && moveRow.nextElementSibling){
+        moveRow.parentNode.insertBefore(moveRow.nextElementSibling, moveRow);
+      }
+      updateMonthlyRecitalPerformanceControls();
+      return;
+    }
     var removeBtn = e.target.closest(".btn-remove-entry");
     if(!removeBtn) return;
     var rows = document.querySelectorAll("#monthlyRecitalPerformanceRows .recital-entry-row");
@@ -2551,6 +2581,7 @@
       return;
     }
     removeBtn.closest(".recital-entry-row").remove();
+    updateMonthlyRecitalPerformanceControls();
   });
 
   document.getElementById("monthlyRecitalForm").addEventListener("submit", function(e){
