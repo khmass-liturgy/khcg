@@ -518,7 +518,6 @@
     </div>
     <div class="header-actions">
       <span id="saveIndicator" class="conn-badge" style="display:none;"></span>
-      <button class="btn-ghost-dark" id="installBtn" type="button">📲 홈화면 추가</button>
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </div>
@@ -2977,6 +2976,8 @@
 
     var deferredPrompt = null;
     var installBtn = document.getElementById("installBtn");
+    // 홈화면 추가 버튼을 표시하지 않는 배포에서는 설치 이벤트도 연결하지 않는다.
+    if(!installBtn) return;
 
     window.addEventListener("beforeinstallprompt", function(e){
       e.preventDefault();
