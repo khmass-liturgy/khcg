@@ -173,7 +173,9 @@
   body:not(.is-admin) .score-actions,
   body:not(.is-admin) .member-actions,
   body:not(.is-admin) .rehearsal-actions,
-  body:not(.is-admin) .attend-toggle{
+  body:not(.is-admin) .attend-toggle,
+  body:not(.is-admin) .external-attend-editor,
+  body:not(.is-admin) .external-attend-remove{
     display:none !important;
   }
   body:not(.is-admin) .status-select,
@@ -662,6 +664,18 @@
     </div>
     <div id="attendTallyPage" class="attend-tally" style="display:none;"></div>
     <div id="attendListPage" class="attend-modal-list"></div>
+    <div id="externalAttendSection" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--paper-line);">
+      <h3 style="font-size:15px;color:var(--wood);margin-bottom:5px;">👥 외부 참석자 <span id="externalAttendCount" class="count"></span></h3>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 10px;">단원 명단에는 등록하지 않고, 이 날짜의 참석자로만 기록합니다.</p>
+      <div id="externalAttendList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;"></div>
+      <form id="externalAttendForm" class="external-attend-editor" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+        <div style="flex:1 1 180px;min-width:0;">
+          <label for="externalAttendName" style="display:block;font-size:12px;font-weight:700;color:var(--wood);margin-bottom:4px;">외부 참석자 이름</label>
+          <input id="externalAttendName" type="text" maxlength="40" placeholder="이름 입력" autocomplete="off" style="width:100%;padding:9px 11px;border:1px solid var(--paper-line);border-radius:9px;font:inherit;">
+        </div>
+        <button type="submit" class="btn-secondary" style="padding:9px 13px;">+ 외부 참석자 추가</button>
+      </form>
+    </div>
     <div id="attendEmpty" class="empty-state" style="display:none;">
       <span class="glyph">📋</span>
       <p><strong>출석 체크할 일정이 없습니다.</strong></p>
@@ -695,7 +709,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-1</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-2</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2209,14 +2223,42 @@
   ============================================================ */
   var currentAttendId = null;
 
-  function renderAttendTallyPage(att){
+  function externalAttendeeNames(r){
+    if(!r || !Array.isArray(r.externalAttendees)) return [];
+    return r.externalAttendees.filter(function(name){ return typeof name === "string" && name.trim(); });
+  }
+
+  function renderAttendTallyPage(att, externalAttendees){
     var el = document.getElementById("attendTallyPage");
     var total = state.members.length;
     var present = state.members.filter(function(m){ return att[m.id] === true; }).length;
     var absent  = state.members.filter(function(m){ return att[m.id] === false; }).length;
     var unchecked = total - present - absent;
+    var externalCount = (externalAttendees || []).length;
     el.style.display = "block";
-    el.textContent = "✅ 출석 "+present+"명   ❌ 결석 "+absent+"명   — 미확인 "+unchecked+"명";
+    el.textContent = "단원: ✅ 출석 "+present+"명   ❌ 결석 "+absent+"명   — 미확인 "+unchecked+"명   |   👥 외부 참석 "+externalCount+"명";
+  }
+
+  function renderExternalAttendees(r){
+    var section = document.getElementById("externalAttendSection");
+    var list = document.getElementById("externalAttendList");
+    var count = document.getElementById("externalAttendCount");
+    if(!section || !list || !count) return;
+    if(!r || r.cancelled){
+      section.style.display = "none";
+      return;
+    }
+    var names = externalAttendeeNames(r);
+    section.style.display = "block";
+    count.textContent = "("+names.length+")";
+    list.innerHTML = names.length
+      ? names.map(function(name, idx){
+          return '<span style="display:inline-flex;align-items:center;gap:5px;padding:6px 9px;background:var(--status-practice-bg);border:1px solid var(--gold-soft);border-radius:999px;font-size:13px;">'+
+            escapeHtml(name)+
+            '<button type="button" class="external-attend-remove" data-remove-external-index="'+idx+'" aria-label="'+escapeHtml(name)+' 삭제" style="border:0;background:none;color:var(--danger);font-size:16px;line-height:1;cursor:pointer;padding:0;">×</button>'+
+          '</span>';
+        }).join("")
+      : '<span style="font-size:13px;color:var(--ink-faint);">등록된 외부 참석자가 없습니다.</span>';
   }
 
   // 최근 6회차 수업의 참석 인원 요약 (출석부 하단)
@@ -2229,7 +2271,7 @@
     // 이미 지난(오늘 포함) 수업, 또는 출석 체크가 있는 수업만 대상 (휴강일 제외)
     var sessions = state.rehearsals.filter(function(r){
       if(r.cancelled) return false;
-      return r.date <= today || (r.attendance && Object.keys(r.attendance).length > 0);
+      return r.date <= today || (r.attendance && Object.keys(r.attendance).length > 0) || externalAttendeeNames(r).length > 0;
     }).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 6);
 
     if(sessions.length === 0){
@@ -2246,10 +2288,11 @@
       var att = r.attendance || {};
       var present = Object.keys(att).filter(function(k){ return att[k] === true; }).length;
       var checked = Object.keys(att).length;
+      var external = externalAttendeeNames(r).length;
       var pct = Math.round(present / totalMembers * 100);
-      var label = checked === 0
+      var label = checked === 0 && external === 0
         ? '<span style="color:var(--ink-faint);">미체크</span>'
-        : present + "명";
+        : present + "명" + (external ? ' <span style="color:var(--status-practice);">+ 외부 '+external+'명</span>' : '');
       return '<div class="bar-row">'+
         '<span class="name" style="flex:0 0 108px;">'+formatDateFull(r.date)+'</span>'+
         '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%; background:var(--status-done);"></div></div>'+
@@ -2270,15 +2313,18 @@
         '<p style="font-size:12.5px;color:var(--ink-faint);margin-top:8px;">출석 체크가 필요 없어요.</p>'+
       '</div>';
       document.getElementById("attendTallyPage").style.display = "none";
+      renderExternalAttendees(null);
       return;
     }
 
     if(!r.attendance) r.attendance = {};
     var att = r.attendance;
+    var externalAttendees = externalAttendeeNames(r);
+    renderExternalAttendees(r);
 
     if(state.members.length === 0){
       box.innerHTML = '<p style="color:var(--ink-faint);font-size:13.5px;">등록된 단원이 없습니다. 먼저 단원 탭에서 단원을 추가해주세요.</p>';
-      document.getElementById("attendTallyPage").style.display = "none";
+      renderAttendTallyPage(att, externalAttendees);
       return;
     }
 
@@ -2301,7 +2347,7 @@
     });
     box.innerHTML = html;
     document.getElementById("attendTallyPage").style.display = "block";
-    renderAttendTallyPage(att);
+    renderAttendTallyPage(att, externalAttendees);
   }
 
   function renderAttendancePage(){
@@ -2315,6 +2361,7 @@
       select.style.display = "none";
       listBox.innerHTML = "";
       tallyBox.style.display = "none";
+      renderExternalAttendees(null);
       empty.style.display = "block";
       renderAttendRecent();
       return;
@@ -2370,7 +2417,42 @@
     row.querySelectorAll(".attend-btn").forEach(function(b){ b.classList.remove("present","absent"); });
     if(r.attendance[mid] === true)  row.querySelector("[data-val=present]").classList.add("present");
     if(r.attendance[mid] === false) row.querySelector("[data-val=absent]").classList.add("absent");
-    renderAttendTallyPage(r.attendance);
+    renderAttendTallyPage(r.attendance, externalAttendeeNames(r));
+    renderAttendRecent();
+  });
+
+  document.getElementById("externalAttendForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    if(!document.body.classList.contains("is-admin") || !currentAttendId) return;
+    var r = state.rehearsals.find(function(x){ return x.id === currentAttendId; });
+    if(!r || r.cancelled) return;
+    var input = document.getElementById("externalAttendName");
+    var name = input.value.trim();
+    if(!name) return;
+    if(!Array.isArray(r.externalAttendees)) r.externalAttendees = [];
+    if(r.externalAttendees.indexOf(name) !== -1){
+      alert("이미 등록된 외부 참석자입니다.");
+      return;
+    }
+    r.externalAttendees.push(name);
+    input.value = "";
+    saveState();
+    renderExternalAttendees(r);
+    renderAttendTallyPage(r.attendance || {}, externalAttendeeNames(r));
+    renderAttendRecent();
+  });
+
+  document.getElementById("externalAttendList").addEventListener("click", function(e){
+    var removeBtn = e.target.closest("[data-remove-external-index]");
+    if(!removeBtn || !document.body.classList.contains("is-admin") || !currentAttendId) return;
+    var r = state.rehearsals.find(function(x){ return x.id === currentAttendId; });
+    if(!r || !Array.isArray(r.externalAttendees)) return;
+    var idx = Number(removeBtn.dataset.removeExternalIndex);
+    if(!Number.isInteger(idx) || idx < 0 || idx >= r.externalAttendees.length) return;
+    r.externalAttendees.splice(idx, 1);
+    saveState();
+    renderExternalAttendees(r);
+    renderAttendTallyPage(r.attendance || {}, externalAttendeeNames(r));
     renderAttendRecent();
   });
 
@@ -2566,6 +2648,7 @@
         memo: "",
         cancelled: false,
         cancelReason: "",
+        externalAttendees: [],
         sample: false
       });
     });
@@ -2592,11 +2675,14 @@
       pieceIds: isCancelled ? [] : pieceIds,
       memo: document.getElementById("rehearsalMemo").value.trim(),
       cancelled: isCancelled,
-      cancelReason: isCancelled ? document.getElementById("rehearsalCancelReason").value.trim() : ""
+      cancelReason: isCancelled ? document.getElementById("rehearsalCancelReason").value.trim() : "",
+      externalAttendees: []
     };
     if(!data.date) return;
     if(id){
-      Object.assign(state.rehearsals.find(function(r){ return r.id === id; }), data);
+      var existingRehearsal = state.rehearsals.find(function(r){ return r.id === id; });
+      data.externalAttendees = externalAttendeeNames(existingRehearsal);
+      Object.assign(existingRehearsal, data);
     } else {
       data.id = uid(); data.sample = false;
       state.rehearsals.push(data);
