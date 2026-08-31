@@ -425,9 +425,13 @@
   .recital-card .recital-label{ color:var(--ink-faint); font-size:12px; }
   .recital-actions{ display:flex; justify-content:flex-end; margin-top:16px; }
   .recital-performance-list{ display:flex; flex-direction:column; gap:8px; margin:10px 0 0; padding:0; list-style:none; }
-  .recital-performance-list li{ display:flex; justify-content:space-between; gap:12px; padding:8px 10px; background:#FFFDF9; border:1px solid var(--paper-line); border-radius:8px; font-size:13.5px; }
-  .recital-performance-list .performer{ color:var(--wood-dark); font-weight:800; flex:0 0 34%; }
+  .recital-performance-list li{ display:grid; grid-template-columns:22px minmax(72px,.7fr) minmax(110px,1.3fr); align-items:center; gap:8px; padding:8px 10px; background:#FFFDF9; border:1px solid var(--paper-line); border-radius:8px; font-size:13.5px; }
+  .recital-performance-list .order{ color:var(--gold); font-family:var(--serif); font-weight:900; }
+  .recital-performance-list .performer{ color:var(--wood-dark); font-weight:800; }
   .recital-performance-list .piece{ color:var(--ink-soft); text-align:right; word-break:break-word; }
+  .recital-performance-list .recital-piece-link{ border:0; background:transparent; color:var(--wood); cursor:pointer; font:inherit; font-weight:700; padding:0; text-align:right; text-decoration:underline; text-decoration-color:var(--gold-soft); text-underline-offset:3px; }
+  .recital-performance-list .recital-piece-link:hover,.recital-performance-list .recital-piece-link:focus-visible{ color:var(--gold); outline:none; }
+  .score-card.score-card-focus{ outline:3px solid var(--gold); outline-offset:3px; }
   .recital-entry-rows{ display:flex; flex-direction:column; gap:8px; }
   .recital-entry-row{ display:grid; grid-template-columns:minmax(120px,.85fr) minmax(140px,1.4fr) auto; gap:7px; align-items:center; }
   .recital-entry-row select,.recital-entry-row input{ border:1px solid var(--paper-line); border-radius:9px; padding:9px 10px; font:inherit; min-width:0; }
@@ -752,7 +756,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-7</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-8</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2400,13 +2404,32 @@
     }] : [];
   }
 
+  function normalizedScoreTitle(title){
+    return String(title || "").toLocaleLowerCase("ko").replace(/\s+/g, "").trim();
+  }
+
+  function scoreForPresentationPiece(piece){
+    var pieceKey = normalizedScoreTitle(piece);
+    if(!pieceKey) return null;
+    var exact = state.scores.find(function(score){ return normalizedScoreTitle(score.title) === pieceKey; });
+    if(exact) return exact;
+    return state.scores.find(function(score){
+      var scoreKey = normalizedScoreTitle(score.title);
+      return pieceKey.length >= 3 && (scoreKey.indexOf(pieceKey) > -1 || pieceKey.indexOf(scoreKey) > -1);
+    }) || null;
+  }
+
   function monthlyRecitalCardHtml(recital, label){
     var dateInfo = monthlyRecitalDateInfo(recital);
     var performances = monthlyRecitalPerformances(recital);
-    var performanceHtml = performances.length ? '<ul class="recital-performance-list">'+performances.map(function(performance){
+    var performanceHtml = performances.length ? '<ul class="recital-performance-list">'+performances.map(function(performance, index){
       var presenter = performance.presenter ? escapeHtml(performance.presenter) : '발표자 미정';
       var piece = performance.piece ? escapeHtml(performance.piece) : '발표곡 미정';
-      return '<li><span class="performer">'+presenter+'</span><span class="piece">'+piece+'</span></li>';
+      var linkedScore = scoreForPresentationPiece(performance.piece);
+      var pieceHtml = linkedScore
+        ? '<button type="button" class="piece recital-piece-link" data-open-score="'+escapeHtml(linkedScore.id)+'" title="악보함에서 보기">'+piece+' ›</button>'
+        : '<span class="piece">'+piece+'</span>';
+      return '<li><span class="order">'+(index+1)+'</span><span class="performer">'+presenter+'</span>'+pieceHtml+'</li>';
     }).join("")+'</ul>' : '<div class="recital-value" style="color:var(--ink-faint);font-weight:400;">발표자와 발표곡을 입력하세요.</div>';
     return '<article class="recital-card">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">'+
@@ -2488,9 +2511,30 @@
   }
 
   document.getElementById("monthlyRecitalList").addEventListener("click", function(e){
+    var scoreBtn = e.target.closest("[data-open-score]");
+    if(scoreBtn){
+      openScoreFromRecital(scoreBtn.dataset.openScore);
+      return;
+    }
     var editBtn = e.target.closest("[data-edit-recital]");
     if(editBtn && document.body.classList.contains("is-admin")) openMonthlyRecitalModal(editBtn.dataset.editRecital);
   });
+
+  function openScoreFromRecital(scoreId){
+    var score = state.scores.find(function(item){ return item.id === scoreId; });
+    if(!score) return;
+    document.querySelector('.tab-btn[data-tab="scores"]').click();
+    scoreFilters = { status:"all", diff:"all", type:"all", query:score.title.toLowerCase() };
+    document.querySelectorAll("#typeChips .chip, #statusChips .chip").forEach(function(chip){ chip.classList.toggle("active", chip.dataset.type === "all" || chip.dataset.status === "all"); });
+    document.getElementById("diffFilter").value = "all";
+    document.getElementById("scoreSearch").value = score.title;
+    renderScores();
+    var scoreCard = document.querySelector('.score-card[data-id="'+CSS.escape(scoreId)+'"]');
+    if(!scoreCard) return;
+    scoreCard.scrollIntoView({ behavior:"smooth", block:"center" });
+    scoreCard.classList.add("score-card-focus");
+    setTimeout(function(){ scoreCard.classList.remove("score-card-focus"); }, 2200);
+  }
 
   document.getElementById("addMonthlyRecitalPerformance").addEventListener("click", function(){
     addMonthlyRecitalPerformanceRow();
