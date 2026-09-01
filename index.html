@@ -727,6 +727,10 @@
     <div class="section-head"><h2>월례발표회</h2></div>
     <p style="font-size:13.5px;color:var(--ink-soft);margin:-8px 0 16px;">연습(수업) 일정에서 ‘월례발표회 일정’으로 표시한 날짜를 기준으로 회차를 관리합니다.</p>
     <div id="monthlyRecitalList" class="recital-grid"></div>
+    <div id="monthlyRecitalHistoryWrap" style="margin-top:30px;">
+      <h3 style="font-size:15px;color:var(--wood);margin-bottom:10px;">📜 지난 발표회 내역 <span style="color:var(--ink-faint);font-weight:400;">최근 6회</span></h3>
+      <div id="monthlyRecitalHistory" class="recital-grid"></div>
+    </div>
   </section>
 
   <!-- ===================== 초급과정 교육시스템 ===================== -->
@@ -760,7 +764,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.08.31-9</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.09.01-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2448,6 +2452,7 @@
 
   function renderMonthlyRecitals(){
     var box = document.getElementById("monthlyRecitalList");
+    var historyBox = document.getElementById("monthlyRecitalHistory");
     if(!box) return;
     var currentMonth = monthKeyFromISO(todayISO());
     var nextMonth = addMonthsToKey(currentMonth, 1);
@@ -2457,6 +2462,13 @@
       current ? monthlyRecitalCardHtml(current, "이번 달") : "",
       next ? monthlyRecitalCardHtml(next, "다음 달") : ""
     ].join("") || '<p style="color:var(--ink-faint);font-size:13.5px;">월례발표회 일정을 준비하고 있습니다.</p>';
+    if(historyBox){
+      var pastRecitals = state.monthlyRecitals.filter(function(item){ return item && item.month < currentMonth; })
+        .sort(function(a,b){ return b.month.localeCompare(a.month); }).slice(0, 6);
+      historyBox.innerHTML = pastRecitals.length
+        ? pastRecitals.map(function(recital){ return monthlyRecitalCardHtml(recital, "지난 발표회"); }).join("")
+        : '<p style="color:var(--ink-faint);font-size:13.5px;">지난 발표회 기록이 아직 없습니다.</p>';
+    }
   }
 
   function openMonthlyRecitalModal(id){
