@@ -764,7 +764,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.09.01-1</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.09.07-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -938,6 +938,10 @@
         <div class="field" id="pieceFieldWrap">
           <label>연습곡 및 공지(기타) <span class="hint">이번 수업에서 다룰 항목을 선택하세요</span></label>
           <div id="pieceCheckboxes" class="checkbox-list"></div>
+          <div class="field" style="margin-top:14px;">
+            <label for="rehearsalCustomNotices">공지(기타) 직접 입력 <span class="hint">한 줄에 한 항목씩</span></label>
+            <textarea id="rehearsalCustomNotices" maxlength="500" placeholder="예: 준비물: 발받침대&#10;예: 다음 주 성당 행사 안내"></textarea>
+          </div>
         </div>
         <div class="field">
           <label for="rehearsalMemo">메모</label>
@@ -2292,6 +2296,11 @@
     }).filter(Boolean);
   }
 
+  function customNoticeItems(rehearsal){
+    if(!rehearsal || !Array.isArray(rehearsal.customNotices)) return [];
+    return rehearsal.customNotices.filter(function(notice){ return typeof notice === "string" && notice.trim(); });
+  }
+
   function renderNextRehearsal(){
     var today = todayISO();
     var upcoming = state.rehearsals.filter(function(r){ return r.date >= today; })
@@ -2315,7 +2324,7 @@
     });
 
     var practiceTitles = pieceTitlesByIds(practicePieces);
-    var noticeTitles   = pieceTitlesByIds(noticeItems);
+    var noticeTitles   = pieceTitlesByIds(noticeItems).concat(customNoticeItems(r));
 
     // 우측 패널 (공지 큰 글씨) — 휴강이면 휴강 표시를 우선
     var rightHtml = "";
@@ -2340,7 +2349,7 @@
   function rehearsalCardHtml(r){
     var d = new Date(r.date + "T00:00:00");
     var isPast = r.date < todayISO();
-    var titles = pieceTitlesByIds(r.pieceIds);
+    var titles = pieceTitlesByIds(r.pieceIds).concat(customNoticeItems(r));
     var cardClass = "rehearsal-card" + (isPast?' past':'') + (r.cancelled?' cancelled':'');
     return '<div class="'+cardClass+'" data-id="'+r.id+'">'+
       '<div class="rehearsal-date-block">'+
@@ -2905,6 +2914,7 @@
     document.getElementById("rehearsalDate").value = r ? r.date : nextThursday(todayISO());
     document.getElementById("rehearsalLocation").value = r ? r.location||"" : "교하성당 마테오방";
     document.getElementById("rehearsalMemo").value = r ? r.memo||"" : "";
+    document.getElementById("rehearsalCustomNotices").value = customNoticeItems(r).join("\n");
     document.getElementById("rehearsalCancelled").checked = !!(r && r.cancelled);
     document.getElementById("rehearsalMonthlyRecital").checked = !!(r && isMonthlyRecitalRehearsal(r));
     document.getElementById("rehearsalCancelReason").value = r ? (r.cancelReason||"") : "";
@@ -3042,6 +3052,7 @@
         location: "교하성당 마테오방",
         pieceIds: [],
         memo: "",
+        customNotices: [],
         cancelled: false,
         cancelReason: "",
         monthlyRecital: false,
@@ -3071,6 +3082,7 @@
       location: document.getElementById("rehearsalLocation").value.trim(),
       pieceIds: isCancelled ? [] : pieceIds,
       memo: document.getElementById("rehearsalMemo").value.trim(),
+      customNotices: isCancelled ? [] : document.getElementById("rehearsalCustomNotices").value.split(/\r?\n/).map(function(notice){ return notice.trim(); }).filter(Boolean),
       cancelled: isCancelled,
       cancelReason: isCancelled ? document.getElementById("rehearsalCancelReason").value.trim() : "",
       monthlyRecital: !isCancelled && document.getElementById("rehearsalMonthlyRecital").checked,
