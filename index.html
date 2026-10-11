@@ -447,9 +447,6 @@
   .intro-check input{ width:18px; height:18px; accent-color:var(--status-done); }
   .intro-bar{ height:12px; background:var(--paper-line); border-radius:999px; overflow:hidden; margin:8px 0; }
   .intro-bar i{ display:block; height:100%; width:0; background:var(--status-done); transition:width .25s; }
-  .intro-gist{ border:1px dashed var(--paper-line); border-radius:10px; padding:12px; margin:12px 0; display:flex; flex-direction:column; gap:8px; }
-  .intro-gist-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .intro-gist-row input{ flex:1; min-width:180px; padding:8px; border:1px solid var(--paper-line); border-radius:8px; font-family:inherit; font-size:13px; background:#fff; }
   .intro-note{ font-size:12.5px; color:var(--ink-faint); }
   @media (max-width:640px){ .intro-lessons{ grid-template-columns:1fr; } .intro-hero h2{ font-size:20px; } }
 
@@ -831,20 +828,6 @@
       <div style="display:flex;align-items:baseline;gap:10px;"><b id="introPct" style="font-family:var(--serif);font-size:26px;color:var(--wood-dark);">0%</b><span id="introCount" class="intro-note">0/10강 완료</span></div>
       <div class="intro-bar"><i id="introBar"></i></div>
       <p class="intro-note">강좌 카드에서 완료를 체크하면 진도율이 계산됩니다. 진도는 이 기기의 브라우저에 저장됩니다. 회원별 학습 기록 저장은 추후 개발 대상입니다.</p>
-      <div class="intro-gist">
-        <b>💾 Gist 저장</b>
-        <div class="intro-gist-row">
-          <input id="introGistToken" type="password" autocomplete="off" placeholder="GitHub Token (gist 권한)">
-          <input id="introGistId" type="text" autocomplete="off" placeholder="Gist ID (처음 저장하면 자동 입력)">
-        </div>
-        <label class="intro-note"><input type="checkbox" id="introGistRemember"> 이 기기에 토큰 기억하기 (공용 기기에서는 체크하지 마세요)</label>
-        <div class="intro-gist-row">
-          <button class="btn-primary" type="button" id="introGistSave">💾 Gist에 저장</button>
-          <button class="btn-primary" type="button" id="introGistLoad">📂 Gist에서 불러오기</button>
-          <span id="introGistStatus" class="intro-note"></span>
-        </div>
-        <p class="intro-note">토큰과 Gist ID를 입력하면 완료 체크 때마다 비공개 Gist(<code>guitar-intro-progress.json</code>)에 자동 저장됩니다.</p>
-      </div>
       <p>서비스 확장 시 영상 플레이어, 강좌별 PDF 악보, 메트로놈, 구간 반복, 연주 녹음, AI 피드백과 진도 관리 기능을 통합할 수 있습니다.</p>
     </div>
 
@@ -885,7 +868,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.11-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.11-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1745,68 +1728,6 @@
   function introSave(arr){
     try{ localStorage.setItem(INTRO_KEY, JSON.stringify(arr)); }catch(e){}
   }
-
-  var INTRO_GIST_FILE = "guitar-intro-progress.json";
-  var INTRO_GIST_ID_KEY = "khcg_intro_gist_id";
-  var INTRO_GIST_TOKEN_KEY = "khcg_intro_gist_token";
-  function introGistStatus(msg, ok){
-    var el = document.getElementById("introGistStatus");
-    el.textContent = msg; el.style.color = ok === false ? "var(--danger)" : (ok ? "var(--status-done)" : "");
-  }
-  function introGistHeaders(token){
-    return {"Authorization":"token " + token, "Accept":"application/vnd.github+json", "Content-Type":"application/json"};
-  }
-  function introGistInit(){
-    try{
-      var id = localStorage.getItem(INTRO_GIST_ID_KEY), t = localStorage.getItem(INTRO_GIST_TOKEN_KEY);
-      if(id) document.getElementById("introGistId").value = id;
-      if(t){ document.getElementById("introGistToken").value = t; document.getElementById("introGistRemember").checked = true; }
-    }catch(e){}
-    document.getElementById("introGistSave").addEventListener("click", function(){ introGistSave(); });
-    document.getElementById("introGistLoad").addEventListener("click", introGistLoad);
-  }
-  async function introGistSave(silent){
-    var token = document.getElementById("introGistToken").value.trim();
-    var idEl = document.getElementById("introGistId");
-    var id = idEl.value.trim();
-    if(!token){ if(!silent) introGistStatus("토큰을 입력하세요", false); return; }
-    introGistStatus("저장 중...");
-    var files = {}; files[INTRO_GIST_FILE] = {content: JSON.stringify({savedAt:new Date().toISOString(), done:introLoad()}, null, 2)};
-    try{
-      var res = await fetch(id ? "https://api.github.com/gists/" + encodeURIComponent(id) : "https://api.github.com/gists", {
-        method: id ? "PATCH" : "POST", headers: introGistHeaders(token),
-        body: JSON.stringify(id ? {files:files} : {description:"교하성당 클래식기타 입문강좌 진도", public:false, files:files})
-      });
-      var data = await res.json();
-      if(!data.id) throw new Error(data.message || "저장 실패");
-      idEl.value = data.id;
-      try{
-        localStorage.setItem(INTRO_GIST_ID_KEY, data.id);
-        if(document.getElementById("introGistRemember").checked) localStorage.setItem(INTRO_GIST_TOKEN_KEY, token);
-        else localStorage.removeItem(INTRO_GIST_TOKEN_KEY);
-      }catch(e){}
-      introGistStatus("✅ 저장 완료 (" + data.id.slice(0,8) + "…)", true);
-    }catch(e){ introGistStatus("❌ " + e.message, false); }
-  }
-  async function introGistLoad(){
-    var token = document.getElementById("introGistToken").value.trim();
-    var id = document.getElementById("introGistId").value.trim();
-    if(!token || !id){ introGistStatus("토큰과 Gist ID가 모두 필요합니다", false); return; }
-    introGistStatus("불러오는 중...");
-    try{
-      var res = await fetch("https://api.github.com/gists/" + encodeURIComponent(id), {headers: introGistHeaders(token)});
-      var data = await res.json();
-      var f = data.files && data.files[INTRO_GIST_FILE];
-      if(!f) throw new Error(data.message || (INTRO_GIST_FILE + " 파일을 찾을 수 없음"));
-      var st = JSON.parse(f.content);
-      if(!Array.isArray(st.done)) throw new Error("데이터 형식 오류");
-      introSave(st.done.filter(function(n){ return typeof n === "number"; }));
-      try{ localStorage.setItem(INTRO_GIST_ID_KEY, id); }catch(e){}
-      renderIntro();
-      introGistStatus("✅ 불러오기 완료", true);
-    }catch(e){ introGistStatus("❌ " + e.message, false); }
-  }
-  introGistInit();
   function renderIntro(){
     var done = introLoad();
     var box = document.getElementById("introLessons");
@@ -1830,7 +1751,6 @@
         var cur = introLoad().filter(function(x){ return x !== n; });
         if(cb.checked) cur.push(n);
         introSave(cur); renderIntro();
-        if(document.getElementById("introGistToken").value.trim() && document.getElementById("introGistId").value.trim()) introGistSave(true);
       });
       lab.appendChild(cb); lab.appendChild(document.createTextNode("이 강좌 완료"));
       [lv, h, d, pr, links, lab].forEach(function(c){ el.appendChild(c); });
