@@ -416,6 +416,40 @@
   }
   @media (max-width:640px){ .training-frame{ min-height:78vh; } }
 
+
+  /* ---------- 입문강좌 ---------- */
+  .intro-hero{ background:linear-gradient(135deg,var(--wood-dark),var(--wood)); color:#fff; border-radius:var(--radius); padding:24px 22px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .intro-hero h2{ color:#fff; font-size:24px; }
+  .intro-hero p{ margin:6px 0 0; color:var(--gold-soft); font-size:14px; }
+  .intro-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+  .intro-stat{ background:var(--paper); border:1px solid var(--paper-line); border-radius:var(--radius); padding:14px 8px; text-align:center; }
+  .intro-stat b{ display:block; font-family:var(--serif); font-size:22px; color:var(--wood-dark); }
+  .intro-stat span{ font-size:12.5px; color:var(--ink-soft); }
+  .intro-box{ background:var(--paper); border:1px solid var(--paper-line); border-radius:var(--radius); padding:16px 18px; margin-bottom:16px; box-shadow:var(--shadow); }
+  .intro-box h3{ font-size:17px; margin-bottom:8px; }
+  .intro-box p{ margin:6px 0; font-size:14px; color:var(--ink-soft); }
+  .intro-table{ width:100%; border-collapse:collapse; font-size:13.5px; margin-top:8px; }
+  .intro-table th,.intro-table td{ border:1px solid var(--paper-line); padding:7px 10px; text-align:left; }
+  .intro-table th{ background:var(--bg); color:var(--wood-dark); }
+  .intro-phases{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .intro-phase{ background:var(--gold-soft); color:var(--wood-dark); border-radius:999px; padding:4px 12px; font-size:13px; font-weight:700; }
+  .intro-lessons{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; margin-bottom:16px; }
+  .intro-lesson{ background:var(--paper); border:1px solid var(--paper-line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:6px; }
+  .intro-lesson.done{ border-color:var(--status-done); background:var(--status-done-bg); }
+  .intro-lesson h4{ margin:0; font-family:var(--serif); font-size:16px; color:var(--wood-dark); }
+  .intro-level{ align-self:flex-start; font-size:11.5px; font-weight:700; border-radius:999px; padding:2px 10px; background:var(--status-review-bg); color:var(--status-review); }
+  .intro-level.l2{ background:var(--status-practice-bg); color:var(--status-practice); }
+  .intro-level.l3{ background:var(--status-done-bg); color:var(--status-done); }
+  .intro-lesson p{ margin:0; font-size:13.5px; color:var(--ink-soft); }
+  .intro-lesson .practice{ color:var(--ink); }
+  .intro-links a{ display:inline-block; margin:2px 10px 2px 0; font-size:13.5px; font-weight:700; }
+  .intro-check{ display:flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; margin-top:auto; padding-top:6px; }
+  .intro-check input{ width:18px; height:18px; accent-color:var(--status-done); }
+  .intro-bar{ height:12px; background:var(--paper-line); border-radius:999px; overflow:hidden; margin:8px 0; }
+  .intro-bar i{ display:block; height:100%; width:0; background:var(--status-done); transition:width .25s; }
+  .intro-note{ font-size:12.5px; color:var(--ink-faint); }
+  @media (max-width:640px){ .intro-lessons{ grid-template-columns:1fr; } .intro-hero h2{ font-size:20px; } }
+
   /* ---------- 월례발표회 ---------- */
   .recital-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
   .recital-card{ background:var(--paper); border:1px solid var(--paper-line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); }
@@ -569,6 +603,7 @@
     <button class="tab-btn" data-tab="attendance">📋 출석부</button>
     <button class="tab-btn" data-tab="recitals">🎤 월례발표회</button>
     <button class="tab-btn" data-tab="training">📚 초급과정 교육시스템</button>
+    <button class="tab-btn" data-tab="intro">🎸 입문강좌</button>
     <button class="tab-btn" data-tab="stats">📊 통계</button>
   </div>
 </nav>
@@ -742,6 +777,75 @@
     <iframe id="trainingFrame" class="training-frame" title="초급과정 교육시스템" data-src="https://khmass-liturgy.github.io/cg/" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
   </section>
 
+  <!-- ===================== 입문강좌 ===================== -->
+  <section id="tab-intro">
+    <div class="intro-hero">
+      <h2>🎸 클래식기타 독학 아카데미</h2>
+      <p>입문부터 중급 진입까지 · 10강 온라인 자기주도 학습 프로그램</p>
+    </div>
+    <p style="font-size:14px;color:var(--ink-soft);margin:0 0 16px;">클래식기타를 처음 잡는 사람도 선생님 없이 동영상 시청 → 따라 연주하기 → 반복 연습 → 자가평가 → 다음 강좌 순서로 공부할 수 있는 교육 시스템으로 구성했습니다.</p>
+
+    <div class="intro-stats">
+      <div class="intro-stat"><b>10강</b><span>전체 커리큘럼</span></div>
+      <div class="intro-stat"><b>10분</b><span>강좌당 학습 영상</span></div>
+      <div class="intro-stat"><b>10~12주</b><span>권장 학습 기간</span></div>
+    </div>
+
+    <div class="intro-box">
+      <h3>학습 과정</h3>
+      <div class="intro-phases"><span class="intro-phase">1~3강 · 입문</span><span class="intro-phase">4~7강 · 초급</span><span class="intro-phase">8~10강 · 중급 준비</span></div>
+      <p>10강의 영상 수업은 총 100분이지만, 실제 연주 능력은 반복 실습으로 형성됩니다. 하루 20~30분씩 꾸준히 연습해 기초를 익히고, 마지막 3강에서 중급 핵심 기술을 경험하도록 설계했습니다. 10강 수료 자체가 중급 실력 달성을 의미하지는 않습니다.</p>
+    </div>
+
+    <div class="intro-box">
+      <h3>1. 강좌 운영 방식</h3>
+      <p>각 강좌는 동일한 10분 구조를 사용합니다.</p>
+      <table class="intro-table">
+        <tr><th>시간</th><th>학습 내용</th></tr>
+        <tr><td>0~1분</td><td>오늘의 목표와 시범 연주</td></tr>
+        <tr><td>1~4분</td><td>핵심 기술 설명</td></tr>
+        <tr><td>4~7분</td><td>손동작을 보며 따라 하기</td></tr>
+        <tr><td>7~9분</td><td>실제 연습곡에 적용</td></tr>
+        <tr><td>9~10분</td><td>자가평가 및 다음 과제</td></tr>
+      </table>
+      <p>각 강좌를 시청한 다음에는 10~20분의 개별 연습을 진행합니다. 기준에 도달하지 못하면 해당 강좌를 다시 학습합니다.</p>
+    </div>
+
+    <div class="section-head"><h2>2. 10강 커리큘럼 및 동영상 자료</h2></div>
+    <p class="intro-note" style="margin:-8px 0 12px;">무료로 공개된 클래식기타 전문 교육 영상 중에서 학습 순서에 맞는 자료를 선별했습니다. 주요 출처는 클래식기타 교육자 Bradford Werner의 This is Classical Guitar입니다. 영문 강좌이지만 손동작을 자세히 보여주며 무료 교재와 연결되는 장점이 있습니다. 원본 영상은 강좌마다 길이가 다르므로 핵심 약 10분을 사용하도록 편성하며, 링크에서 원본 전체를 시청할 수도 있습니다.</p>
+
+    <div id="introLessons" class="intro-lessons"></div>
+    <p class="intro-note">영상은 원 제작자의 강좌 페이지에서 제목과 내용을 확인했습니다. 다만 실제 재생 가능 여부나 정확한 영상 길이는 유튜브 환경에 따라 달라질 수 있습니다.</p>
+
+    <div class="intro-box" style="margin-top:16px;">
+      <h3>3. 독학을 위한 교재 자료</h3>
+      <p><b>Classical Guitar Method Volume 1</b> — Bradford Werner 저술. 오선보·손가락 운지·연습곡·영상 강좌를 연결한 약 100쪽 분량의 무료 교재입니다. 위 10강 중 여러 기초 강좌와 함께 사용할 수 있습니다.</p>
+      <p><a href="https://www.thisisclassicalguitar.com/wp-content/uploads/2024/11/Classical-Guitar-Method-Vol1-Werner.pdf" target="_blank" rel="noopener">📄 무료 PDF 교재 열기</a></p>
+    </div>
+
+    <div class="intro-box">
+      <h3>4. 자가학습 진도 관리</h3>
+      <div style="display:flex;align-items:baseline;gap:10px;"><b id="introPct" style="font-family:var(--serif);font-size:26px;color:var(--wood-dark);">0%</b><span id="introCount" class="intro-note">0/10강 완료</span></div>
+      <div class="intro-bar"><i id="introBar"></i></div>
+      <p class="intro-note">강좌 카드에서 완료를 체크하면 진도율이 계산됩니다. 진도는 이 기기의 브라우저에 저장됩니다. 회원별 학습 기록 저장은 추후 개발 대상입니다.</p>
+      <p>서비스 확장 시 영상 플레이어, 강좌별 PDF 악보, 메트로놈, 구간 반복, 연주 녹음, AI 피드백과 진도 관리 기능을 통합할 수 있습니다.</p>
+    </div>
+
+    <div class="intro-box">
+      <h3>진도 통과 기준</h3>
+      <p>각 강좌를 다음 기준으로 평가합니다.</p>
+      <table class="intro-table">
+        <tr><th>평가 항목</th><th>배점</th></tr>
+        <tr><td>자세와 양손 운지 정확도</td><td>25점</td></tr>
+        <tr><td>음정과 잡음 관리</td><td>25점</td></tr>
+        <tr><td>박자와 템포 유지</td><td>25점</td></tr>
+        <tr><td>과제 완주 및 음악적 연결</td><td>25점</td></tr>
+        <tr><td><b>합계</b></td><td><b>100점</b></td></tr>
+      </table>
+      <p>80점 이상이면 다음 강좌로 진행하도록 권장하되, 손목 통증이나 과도한 힘주기 등이 발견되면 점수와 관계없이 자세를 다시 점검하도록 합니다. AI 채점은 추후 개발할 수 있는 기능이며 현재 점수는 학습자 자가평가 기준입니다.</p>
+    </div>
+  </section>
+
   <!-- ===================== 통계 ===================== -->
   <section id="tab-stats">
     <div class="section-head"><h2>통계</h2></div>
@@ -764,7 +868,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.09.07-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.11-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1600,6 +1704,65 @@
     if(saveDebounceTimer){ flushSaveState(); }
   });
 
+
+  /* ============================================================
+     입문강좌
+  ============================================================ */
+  var INTRO_LESSONS = [
+    {t:"클래식기타와 올바른 연주 자세",lv:1,d:"기타 구조, 조율(E-A-D-G-B-E), 발판, 앉는 자세와 기타 각도",p:"어깨에 힘을 주지 않고 안정적인 자세로 3분 유지",l:[["자세 배우기 · Bradford Werner","https://www.youtube.com/watch?v=dYC9awwT_YQ"]]},
+    {t:"오른손 탄현법의 기초",lv:1,d:"엄지(p), 검지(i), 중지(m), 약지(a), 티란도와 i-m 교대 탄현",p:"1번 줄 개방현을 i-m으로 20회 정확하게 탄현",l:[["오른손 주법 영상","https://www.youtube.com/watch?v=H1R1y0Aahls"]]},
+    {t:"왼손 운지와 프렛 익히기",lv:1,d:"1~4번 손가락 번호, 엄지 위치, 프렛 누르기와 손가락 독립",p:"1~4프렛을 순서대로 누르며 잡음 없이 3회 반복",l:[["왼손 운지 영상","https://www.youtube.com/watch?v=HTjwvwCZmRo"]]},
+    {t:"악보 읽기와 개방현 연주",lv:2,d:"오선보, 음표 길이, 박자, 개방현 E·B·G 음 익히기",p:"4/4박자로 짧은 연습곡 2개 연주",l:[["기초 악보 읽기 영상","https://www.youtube.com/watch?v=V76vbZKFNVs"]]},
+    {t:"첫 멜로디 연주",lv:2,d:"1·2번 줄 선율, 자연스러운 연결, 베토벤 '환희의 송가' 연주",p:"멜로디 한 곡을 중단 없이 완주",l:[["쉬운 멜로디 연주 영상","https://www.youtube.com/watch?v=cvsyIbLw7rk"]]},
+    {t:"아르페지오 기초",lv:2,d:"p-i-m-a, p-a-m-i 등 오른손 분산화음과 균형 잡힌 소리",p:"p-i-m-a 패턴을 일정한 박자로 8회 반복",l:[["아르페지오 영상","https://www.youtube.com/watch?v=cGC6n5Zsf0o"]]},
+    {t:"음계와 양손 협응",lv:2,d:"다장조 1옥타브 스케일, i-m 교대, 메트로놈 활용",p:"느린 속도에서 상행·하행 음계 3회 연주",l:[["음계 연습 영상","https://www.youtube.com/watch?v=xM3XszGQ4Vg"]]},
+    {t:"저음과 선율을 함께 연주하기",lv:3,d:"베이스와 멜로디의 2성부 연주, 음량 균형과 성부 독립",p:"카르카시의 '시칠리아나'를 구간별로 연습",l:[["시칠리아나 레슨 영상","https://www.youtube.com/watch?v=uXdW1TsvXAk"]]},
+    {t:"중급 왼손 테크닉",lv:3,d:"슬러(해머링·풀링), 레가토와 바레 기초",p:"상승·하강 슬러 5회씩, 부분 바레 정확하게 잡기",l:[["슬러 연습 영상","https://www.youtube.com/watch?v=GhsEPksoygA"],["바레 보충","https://www.youtube.com/watch?v=rkv5w4wOXV8"]]},
+    {t:"음악적 표현과 최종 연주",lv:3,d:"강약(p, mf, f), 크레셴도, 프레이징과 녹음 평가",p:"배운 연습곡 중 한 곡을 처음부터 끝까지 녹화",l:[["강약 표현과 연습곡 영상","https://www.youtube.com/watch?v=sfQ0p3JM-Hw"]]}
+  ];
+  var INTRO_LEVELS = ["","입문","초급","중급 준비"];
+  var INTRO_KEY = "khcg_intro_done_v1";
+  function introLoad(){
+    try{ var a = JSON.parse(localStorage.getItem(INTRO_KEY) || "[]"); return Array.isArray(a) ? a : []; }catch(e){ return []; }
+  }
+  function introSave(arr){
+    try{ localStorage.setItem(INTRO_KEY, JSON.stringify(arr)); }catch(e){}
+  }
+  function renderIntro(){
+    var done = introLoad();
+    var box = document.getElementById("introLessons");
+    box.innerHTML = "";
+    INTRO_LESSONS.forEach(function(L, i){
+      var n = i + 1;
+      var el = document.createElement("div");
+      el.className = "intro-lesson" + (done.indexOf(n) >= 0 ? " done" : "");
+      var h = document.createElement("h4"); h.textContent = n + "강. " + L.t;
+      var lv = document.createElement("span"); lv.className = "intro-level" + (L.lv > 1 ? " l" + L.lv : ""); lv.textContent = INTRO_LEVELS[L.lv];
+      var d = document.createElement("p"); d.textContent = L.d;
+      var pr = document.createElement("p"); pr.className = "practice"; pr.textContent = "실습: " + L.p;
+      var links = document.createElement("div"); links.className = "intro-links";
+      L.l.forEach(function(x){
+        var a = document.createElement("a"); a.href = x[1]; a.target = "_blank"; a.rel = "noopener"; a.textContent = "▶ " + x[0];
+        links.appendChild(a);
+      });
+      var lab = document.createElement("label"); lab.className = "intro-check";
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = done.indexOf(n) >= 0;
+      cb.addEventListener("change", function(){
+        var cur = introLoad().filter(function(x){ return x !== n; });
+        if(cb.checked) cur.push(n);
+        introSave(cur); renderIntro();
+      });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode("이 강좌 완료"));
+      [lv, h, d, pr, links, lab].forEach(function(c){ el.appendChild(c); });
+      box.appendChild(el);
+    });
+    var cnt = done.filter(function(n){ return n >= 1 && n <= INTRO_LESSONS.length; }).length;
+    var pct = Math.round(cnt / INTRO_LESSONS.length * 100);
+    document.getElementById("introPct").textContent = pct + "%";
+    document.getElementById("introCount").textContent = cnt + "/" + INTRO_LESSONS.length + "강 완료";
+    document.getElementById("introBar").style.width = pct + "%";
+  }
+
   /* ============================================================
      탭 전환
   ============================================================ */
@@ -1613,6 +1776,7 @@
       if(btn.dataset.tab === "partassign") renderPartAssign();
       if(btn.dataset.tab === "attendance") renderAttendancePage();
       if(btn.dataset.tab === "recitals") renderMonthlyRecitals();
+      if(btn.dataset.tab === "intro") renderIntro();
       if(btn.dataset.tab === "training"){
         var trainingFrame = document.getElementById("trainingFrame");
         if(trainingFrame && !trainingFrame.dataset.loaded){
