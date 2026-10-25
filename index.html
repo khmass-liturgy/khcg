@@ -871,7 +871,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.11-6</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.25-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -939,7 +939,14 @@
           </div>
         </div>
         <div class="field">
-          <label for="scoreLink">총보(전체 악보) 링크 <span class="hint">선택 사항 — 구글드라이브 등 PDF 링크</span></label>
+          <label>c-repo 악보자료실 <span class="hint">선택 사항 — 저장된 악보의 제목과 링크를 가져옵니다</span></label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn-secondary" id="cRepoScorePickerBtn">🎼 c-repo에서 악보 선택</button>
+            <span class="hint" id="cRepoScorePickerStatus">선택 창에서 악보를 고르면 아래 링크가 자동으로 입력됩니다.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="scoreLink">총보(전체 악보) 링크 <span class="hint">선택 사항 — c-repo 또는 구글드라이브 등 PDF 링크</span></label>
           <input type="url" id="scoreLink" placeholder="https://...">
         </div>
         <div class="field" id="partSection">
@@ -2031,6 +2038,36 @@
     }
   }, true);
 
+  var C_REPO_SCORE_PICKER_URL = "https://khmass-liturgy.github.io/c-repo/?picker=khcg";
+  var cRepoScorePickerWindow = null;
+
+  function openCRepoScorePicker(){
+    var status = document.getElementById("cRepoScorePickerStatus");
+    cRepoScorePickerWindow = window.open(C_REPO_SCORE_PICKER_URL, "khcgCRepoScorePicker", "popup=yes,width=1180,height=820,resizable=yes,scrollbars=yes");
+    if(status) status.textContent = cRepoScorePickerWindow
+      ? "c-repo 창에서 가져올 악보의 ‘악보함에 선택’ 버튼을 누르세요."
+      : "팝업이 차단되었습니다. 브라우저에서 팝업을 허용해주세요.";
+  }
+
+  function isTrustedCRepoScoreMessage(event){
+    return event.origin === window.location.origin && event.data && event.data.type === "c-repo-score-selected";
+  }
+
+  window.addEventListener("message", function(event){
+    if(!isTrustedCRepoScoreMessage(event)) return;
+    var selection = event.data;
+    var link = String(selection.scoreLink || "");
+    if(!/^https:\/\/khmass-liturgy\.github\.io\/c-repo\//.test(link)) return;
+    document.getElementById("scoreTitle").value = String(selection.title || selection.fileName || "").replace(/\.[^.]+$/, "");
+    document.getElementById("scoreLink").value = link;
+    var status = document.getElementById("cRepoScorePickerStatus");
+    if(status) status.textContent = "✓ " + (selection.fileName || selection.title || "악보") + " 연결됨";
+    if(cRepoScorePickerWindow && !cRepoScorePickerWindow.closed) cRepoScorePickerWindow.close();
+    cRepoScorePickerWindow = null;
+  });
+
+  document.getElementById("cRepoScorePickerBtn").addEventListener("click", openCRepoScorePicker);
+
   function openScoreModal(id){
     var s = id ? state.scores.find(function(x){ return x.id === id; }) : null;
     document.getElementById("scoreModalTitle").textContent = s ? "악보 수정" : "새 악보 추가";
@@ -2043,6 +2080,9 @@
     document.getElementById("scoreStatus").value = s ? s.status : "연습중";
     document.getElementById("scoreLink").value = s ? s.scoreLink||"" : "";
     document.getElementById("scoreMemo").value = s ? s.memo||"" : "";
+    document.getElementById("cRepoScorePickerStatus").textContent = s && /^https:\/\/khmass-liturgy\.github\.io\/c-repo\//.test(s.scoreLink||"")
+      ? "✓ c-repo 악보가 연결되어 있습니다."
+      : "선택 창에서 악보를 고르면 아래 링크가 자동으로 입력됩니다.";
     var rows = document.getElementById("partRows");
     var partSection = document.getElementById("partSection");
     var scoreType = s ? (s.type||"합주") : "합주";

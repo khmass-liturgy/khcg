@@ -1,0 +1,11 @@
+const fs = require('fs');
+const assert = require('assert');
+const html = fs.readFileSync('index.html', 'utf8');
+assert.match(html, /id="cRepoScorePickerBtn"/);
+assert.match(html, /https:\/\/khmass-liturgy\.github\.io\/c-repo\/\?picker=khcg/);
+assert.match(html, /event\.origin === window\.location\.origin/);
+assert.match(html, /event\.data\.type === "c-repo-score-selected"/);
+assert.match(html, /document\.getElementById\("scoreLink"\)\.value = link/);
+assert.match(html, /v2026\.10\.25-1/);
+for (const match of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) new Function(match[1]);
+console.log('KHCG_SCORE_PICKER_TEST_OK');
