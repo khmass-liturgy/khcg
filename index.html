@@ -163,8 +163,7 @@
   body.is-admin .view-only-banner{ display:none; }
 
   /* ---------- 운영자 로그인 전에는 수정/삭제/추가 UI 숨김 ----------
-     보기(읽기)는 누구나 가능, 쓰기는 Firebase 규칙(auth != null)으로도 강제되므로
-     아래는 UX를 위한 것이며 실제 보안은 서버(Database Rules) 쪽에서 담당함 */
+     아래는 UX용이며 실제 쓰기 권한은 Firebase Database Rules에서 운영자 계정으로 제한해야 함 */
   body:not(.is-admin) #addScoreBtn,
   body:not(.is-admin) #addMemberBtn,
   body:not(.is-admin) #addRehearsalBtn,
@@ -628,7 +627,7 @@
   <div id="memberLoginError" style="display:none;font-size:11.5px;color:var(--danger);margin-top:4px;"></div>
 </div>
 <div class="view-only-banner" id="memberLoggedInBanner" style="display:none;">
-  🔓 <span id="memberLoginEmail"></span>로 로그인됨 · 연락처 열람 가능 (등록·수정은 운영자만 가능)
+  🔓 <span id="memberLoginEmail"></span>로 로그인됨 · <span id="memberPhoneStatus">연락처 불러오는 중…</span> (등록·수정은 운영자만 가능)
   <button type="button" id="memberLogoutBtn" class="btn-text" style="text-decoration:underline;">로그아웃</button>
 </div>
 
@@ -870,7 +869,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.27-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.27-3</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -1188,9 +1187,15 @@
   var auth = null;
   var phonesRef = null;
   var memberPhonesMap = {};
+  var remoteMainData = null;
+  var remotePhonesData = {};
+  var savedViewState = null;
+  var pendingWrites = {};
+  var activeWrites = null;
   // 연락처를 실제로 읽어온 적이 있는지. false면 memberPhonesMap이 "비어 있음"이 아니라
   // "아직 모름"이라는 뜻이므로, 이 상태로 저장하면 기존 연락처를 빈 값으로 덮어쓰게 된다.
   var phonesLoaded = false;
+  var phoneReadError = false;
   // 본 데이터(악보·단원·일정)를 실제로 읽어온 적이 있는지. 읽기가 느리거나 실패해도 화면은
   // 빈 상태로 그려지는데, 그때 저장하면 비어 있는 state로 DB 전체를 덮어쓰게 된다.
   var dataLoaded = false;
@@ -1375,11 +1380,16 @@
           p.memberIds = p.memberId ? [p.memberId] : [];
           changed = true;
         }
-        delete p.memberId;
+        if(Object.prototype.hasOwnProperty.call(p, "memberId")){
+          delete p.memberId;
+          changed = true;
+        }
       });
     });
     // rehearsal time is now fixed every week
-    state.rehearsals.forEach(function(r){ r.time = FIXED_REHEARSAL_TIME; });
+    state.rehearsals.forEach(function(r){
+      if(r.time !== FIXED_REHEARSAL_TIME){ r.time = FIXED_REHEARSAL_TIME; changed = true; }
+    });
 
     // 파트명 표준화: "1st G" / "1st Guitar" 등 기존에 제각각 저장된 값을 "1st"로 통일
     state.members.forEach(function(m){
@@ -1441,11 +1451,10 @@
     return Object.keys(obj).map(function(k){ return obj[k]; });
   }
 
-  // 연락처(phone)는 별도 경로(memberPhones)에 저장하고, Database 규칙에서
-  // "auth != null"(구글 인증한 사람)에게만 읽기를 허용한다. 그 외 필드는 공개.
-  function membersPublicObj(){
+  // 연락처(phone)는 별도 경로에 저장한다. 실제 읽기 권한은 Database Rules에서 제한한다.
+  function membersPublicObj(source){
     var obj = {};
-    (state.members||[]).forEach(function(m){
+    ((source||state).members||[]).forEach(function(m){
       if(!m || !m.id) return;
       var copy = {};
       Object.keys(m).forEach(function(k){ if(k !== "phone") copy[k] = m[k]; });
@@ -1453,40 +1462,152 @@
     });
     return obj;
   }
-  function memberPhonesObj(){
+  function memberPhonesObj(source){
     var obj = {};
-    (state.members||[]).forEach(function(m){
+    ((source||state).members||[]).forEach(function(m){
       if(m && m.id) obj[m.id] = m.phone || "";
     });
     return obj;
   }
   function mergeMemberPhones(){
     state.members.forEach(function(m){
-      if(m && m.id) m.phone = memberPhonesMap[m.id] || "";
+      if(!m || !m.id) return;
+      var legacy = remoteMainData && remoteMainData.members && remoteMainData.members[m.id];
+      m.phone = phonesLoaded
+        ? (Object.prototype.hasOwnProperty.call(memberPhonesMap, m.id) ? memberPhonesMap[m.id] : ((legacy && legacy.phone) || ""))
+        : "";
     });
+  }
+  function isAdminUser(){
+    return !!(auth && auth.currentUser && ADMIN_EMAILS.indexOf((auth.currentUser.email||"").toLowerCase()) !== -1);
+  }
+  function cloneData(value){
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+  function mainDataFromState(source){
+    source = source || state;
+    return {
+      scores: arrayToObj(source.scores),
+      members: membersPublicObj(source),
+      rehearsals: arrayToObj(source.rehearsals),
+      monthlyRecitals: arrayToObj(source.monthlyRecitals),
+      sample: !!source.sample
+    };
+  }
+  function setNestedValue(root, path, value){
+    var parts = path.split("/");
+    var node = root;
+    for(var i=0; i<parts.length-1; i++){
+      if(!node[parts[i]] || typeof node[parts[i]] !== "object") node[parts[i]] = {};
+      node = node[parts[i]];
+    }
+    if(value === null) delete node[parts[parts.length-1]];
+    else node[parts[parts.length-1]] = cloneData(value);
+  }
+  function applyWrites(base, writes, prefix){
+    var result = cloneData(base || {});
+    Object.keys(writes || {}).filter(function(path){ return path.indexOf(prefix + "/") === 0; })
+      .sort(function(a,b){ return a.length-b.length; })
+      .forEach(function(path){ setNestedValue(result, path.slice(prefix.length+1), writes[path]); });
+    return result;
+  }
+  function queueWrite(path, value){
+    Object.keys(pendingWrites).forEach(function(key){
+      if(key.indexOf(path + "/") === 0) delete pendingWrites[key];
+    });
+    var parent = Object.keys(pendingWrites).find(function(key){ return path.indexOf(key + "/") === 0; });
+    if(parent){
+      if(pendingWrites[parent] === null) pendingWrites[parent] = {};
+      setNestedValue(pendingWrites[parent], path.slice(parent.length+1), value);
+    } else {
+      pendingWrites[path] = cloneData(value);
+    }
+  }
+  function diffValues(before, after, path, changes){
+    if(JSON.stringify(before) === JSON.stringify(after)) return;
+    if(before && after && typeof before === "object" && typeof after === "object" &&
+       !Array.isArray(before) && !Array.isArray(after)){
+      var keys = {};
+      Object.keys(before).forEach(function(key){ keys[key] = true; });
+      Object.keys(after).forEach(function(key){ keys[key] = true; });
+      Object.keys(keys).forEach(function(key){ diffValues(before[key], after[key], path + "/" + key, changes); });
+    } else {
+      changes[path] = after === undefined ? null : cloneData(after);
+    }
+  }
+  function queueLegacyPhoneMigration(){
+    if(!isAdminUser() || !phonesLoaded || !remoteMainData || !remoteMainData.members) return;
+    var changed = false;
+    Object.keys(remoteMainData.members).forEach(function(id){
+      var member = remoteMainData.members[id];
+      if(!member || !Object.prototype.hasOwnProperty.call(member, "phone")) return;
+      if(!state.members.some(function(item){ return item.id === id; })) return;
+      if(member.phone && !Object.prototype.hasOwnProperty.call(memberPhonesMap, id)){
+        queueWrite(PHONES_PATH + "/" + id, member.phone);
+      }
+      queueWrite(DB_PATH + "/members/" + id + "/phone", null);
+      changed = true;
+    });
+    if(changed) scheduleSaveState();
+  }
+  function renderStateFromRemote(){
+    if(!dataLoaded) return;
+    var main = applyWrites(remoteMainData, activeWrites, DB_PATH);
+    main = applyWrites(main, pendingWrites, DB_PATH);
+    var phones = applyWrites(remotePhonesData, activeWrites, PHONES_PATH);
+    memberPhonesMap = applyWrites(phones, pendingWrites, PHONES_PATH);
+    state = {
+      scores: objToArray(main.scores),
+      members: objToArray(main.members),
+      rehearsals: objToArray(main.rehearsals),
+      monthlyRecitals: objToArray(main.monthlyRecitals),
+      sample: !!main.sample
+    };
+    if(!Object.keys(main).length){
+      savedViewState = cloneData(state);
+      seedSampleData();
+      if(isAdminUser()) saveState();
+      else savedViewState = cloneData(state);
+    } else {
+      mergeMemberPhones();
+      savedViewState = cloneData(state);
+      if(migrateData() && isAdminUser()) saveState();
+      else savedViewState = cloneData(state);
+      queueLegacyPhoneMigration();
+    }
+    renderAll();
   }
   function attachPhonesListener(isAuthed){
     if(phonesRef){ phonesRef.off(); phonesRef = null; }
     if(!db || !isAuthed){
+      remotePhonesData = {};
       memberPhonesMap = {};
       phonesLoaded = false;
-      mergeMemberPhones();
-      renderMembers();
+      phoneReadError = false;
+      updatePhoneStatus();
+      renderStateFromRemote();
       return;
     }
     phonesRef = db.ref(PHONES_PATH);
     phonesRef.on("value", function(snap){
-      memberPhonesMap = snap.val() || {};
+      remotePhonesData = snap.val() || {};
       phonesLoaded = true;
-      mergeMemberPhones();
-      renderMembers();
+      phoneReadError = false;
+      updatePhoneStatus();
+      renderStateFromRemote();
     }, function(err){
       console.error("연락처 읽기 오류:", err);
+      remotePhonesData = {};
       memberPhonesMap = {};
       phonesLoaded = false;
-      mergeMemberPhones();
-      renderMembers();
+      phoneReadError = true;
+      updatePhoneStatus();
+      renderStateFromRemote();
     });
+  }
+  function updatePhoneStatus(){
+    var el = document.getElementById("memberPhoneStatus");
+    if(el) el.textContent = phonesLoaded ? "연락처 열람 가능" : (phoneReadError ? "연락처를 읽지 못했습니다" : "연락처 불러오는 중…");
   }
 
   function doInitFirebase(config){
@@ -1497,54 +1618,23 @@
       phonesRef = null;
 
       auth.onAuthStateChanged(function(user){
-        // 연락처 열람 권한은 관리자 여부와 무관하게 "구글 인증 여부"만 따른다 (DB 규칙과 동일한 기준)
-        attachPhonesListener(!!user);
-        // 쓰기 권한은 ADMIN_EMAILS에 등록된 계정만. 그 외 구글 계정은 로그아웃시키지 않고
-        // "단원" 상태로 유지해 연락처만 볼 수 있게 한다 (실제 쓰기 차단은 Database 규칙이 담당).
         var isAdmin = !!(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) !== -1);
         setAdminState(isAdmin, user);
+        attachPhonesListener(!!user);
+        renderStateFromRemote();
       });
 
       var rendered = false;
       db.ref(DB_PATH).on("value", function(snapshot){
         try{
-          var data = snapshot.val();
-          // 스냅샷이 도착했다는 것은 DB의 현재 상태를 알게 됐다는 뜻 (data가 null이면 빈 DB).
-          // 이 시점 이후로만 저장을 허용한다.
+          remoteMainData = snapshot.val();
           dataLoaded = true;
-          if(data){
-            state.scores    = objToArray(data.scores);
-            state.members   = objToArray(data.members);
-            state.rehearsals= objToArray(data.rehearsals);
-            state.monthlyRecitals = objToArray(data.monthlyRecitals);
-            state.sample    = !!data.sample;
-            // 데이터 정리(마이그레이션)는 관리자로 로그인된 세션에서만 저장 시도
-            // (비로그인 상태에서 저장을 시도하면 Database 규칙에 막혀 무한 재시도가 발생함)
-            var needsMigration = migrateData();
-            // 이전 구조: phone이 members/{id} 안에 그대로 저장되어 있어 공개 읽기로 노출됨.
-            // 분리 이전 시, 값을 memberPhonesMap으로 먼저 옮겨두지 않으면
-            // 아래 mergeMemberPhones()에서 번호가 빈 값으로 덮여 유실된다.
-            var legacyPhoneEmbedded = false;
-            state.members.forEach(function(m){
-              if(!m || !Object.prototype.hasOwnProperty.call(m, "phone")) return;
-              legacyPhoneEmbedded = true;
-              if(m.phone && !memberPhonesMap[m.id]){
-                memberPhonesMap[m.id] = m.phone;
-                phonesLoaded = true;
-              }
-            });
-            mergeMemberPhones();
-            if((needsMigration || legacyPhoneEmbedded) && auth && auth.currentUser) saveState();
-          } else {
-            seedSampleData();
-            mergeMemberPhones();
-            if(auth && auth.currentUser) saveState();
-          }
+          renderStateFromRemote();
         }catch(e){
+          dataLoaded = false;
           console.error("데이터 처리 오류:", e);
         }
         rendered = true;
-        renderAll();
       }, function(err){
         console.error("Firebase 읽기 오류:", err);
         if(!rendered){ rendered = true; renderAll(); }
@@ -1579,9 +1669,7 @@
   // ---- 저장 디바운스: 짧은 시간에 여러 번 바뀌어도 Firebase 쓰기는 한 번만 ----
   var saveDebounceTimer = null;
   var saveInFlight = false;
-  var saveQueuedAgain = false;
 
-  // 정상 저장(저장 중·저장됨)은 표시하지 않고, 저장이 실패했을 때만 알린다
   function updateSaveIndicator(state){
     var el = document.getElementById("saveIndicator");
     if(!el) return;
@@ -1598,42 +1686,55 @@
       el.textContent = "⚠️ 저장 권한 없음 (운영자 로그인 필요)";
       el.style.color = "#F4A4A4";
       el.style.display = "";
-      updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 4000);
+    } else if(state === "pending" || state === "saving"){
+      el.textContent = state === "pending" ? "저장 대기 중…" : "저장 중…";
+      el.style.color = "";
+      el.style.display = "";
+    } else if(state === "saved"){
+      el.textContent = "✓ 저장 완료";
+      el.style.color = "";
+      el.style.display = "";
+      updateSaveIndicator._hideTimer = setTimeout(function(){ el.style.display = "none"; }, 2500);
     } else {
-      // pending / saving / saved — 조용히 숨김 (이전 오류 표시도 함께 사라짐)
       el.style.display = "none";
     }
   }
 
+  function scheduleSaveState(){
+    if(!Object.keys(pendingWrites).length) return;
+    updateSaveIndicator("pending");
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(flushSaveState, 700);
+  }
   function flushSaveState(){
     if(!db) return;
-    // 아직 한 번도 읽어오지 못했다면 state는 "비어 있음"이 아니라 "모름"이다.
-    // 이 상태로 쓰면 악보·단원·일정이 통째로 지워지므로 저장하지 않는다.
     if(!dataLoaded){
       console.warn("데이터를 아직 불러오지 못해 저장을 건너뜁니다.");
       updateSaveIndicator("notloaded");
       return;
     }
+    if(!isAdminUser()){
+      updateSaveIndicator("denied");
+      return;
+    }
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
-    if(saveInFlight){ saveQueuedAgain = true; return; }
+    if(saveInFlight || !Object.keys(pendingWrites).length) return;
+    var writes = pendingWrites;
+    pendingWrites = {};
+    activeWrites = writes;
     saveInFlight = true;
     updateSaveIndicator("saving");
-    var writes = [
-      db.ref(DB_PATH).set({
-        scores:     arrayToObj(state.scores),
-        members:    membersPublicObj(),
-        rehearsals: arrayToObj(state.rehearsals),
-        monthlyRecitals: arrayToObj(state.monthlyRecitals),
-        sample:     !!state.sample
-      })
-    ];
-    // 연락처를 아직 읽어오지 못한 상태에서 저장하면 기존 번호가 전부 지워지므로 건드리지 않는다
-    if(phonesLoaded) writes.push(db.ref(PHONES_PATH).set(memberPhonesObj()));
-    Promise.all(writes).then(function(){
+    // 한 번의 다중 경로 update로 변경된 필드만 원자적으로 저장한다.
+    db.ref().update(writes).then(function(){
       saveInFlight = false;
-      if(saveQueuedAgain){
-        saveQueuedAgain = false;
+      // value 이벤트가 아직 도착하지 않았어도 저장 완료분을 화면 기준에 반영한다.
+      // 이후 도착하는 원격 스냅샷은 다시 최신 서버 상태로 대체된다.
+      remoteMainData = applyWrites(remoteMainData, writes, DB_PATH);
+      remotePhonesData = applyWrites(remotePhonesData, writes, PHONES_PATH);
+      activeWrites = null;
+      renderStateFromRemote();
+      if(Object.keys(pendingWrites).length){
         flushSaveState();
       } else {
         updateSaveIndicator("saved");
@@ -1641,31 +1742,50 @@
     }).catch(function(err){
       console.error("Firebase 쓰기 오류:", err);
       saveInFlight = false;
+      activeWrites = null;
+      var newerWrites = pendingWrites;
+      pendingWrites = {};
+      Object.keys(writes).forEach(function(path){ queueWrite(path, writes[path]); });
+      Object.keys(newerWrites).forEach(function(path){ queueWrite(path, newerWrites[path]); });
+      renderStateFromRemote();
       var denied = err && (err.code === "PERMISSION_DENIED" || /permission_denied/i.test(err.message||""));
       if(denied){
-        // 권한 문제는 재시도해도 계속 실패하므로 무한 재시도하지 않음
         updateSaveIndicator("denied");
       } else {
         updateSaveIndicator("error");
-        // 네트워크 등 일시적 오류로 보이는 경우에만 잠시 후 재시도
         saveDebounceTimer = setTimeout(flushSaveState, 2000);
       }
     });
   }
 
   function saveState(){
-    if(!db) return;
-    updateSaveIndicator("pending");
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = setTimeout(flushSaveState, 700);
+    if(!db || !dataLoaded){ updateSaveIndicator("notloaded"); return; }
+    if(!isAdminUser()){ updateSaveIndicator("denied"); return; }
+    var before = savedViewState || { scores:[], members:[], rehearsals:[], monthlyRecitals:[], sample:false };
+    var previous = mainDataFromState(before);
+    var current = mainDataFromState(state);
+    var changes = {};
+    ["scores","members","rehearsals","monthlyRecitals","sample"].forEach(function(key){
+      diffValues(previous[key], current[key], DB_PATH + "/" + key, changes);
+    });
+    if(phonesLoaded){
+      diffValues(memberPhonesObj(before), memberPhonesObj(state), PHONES_PATH, changes);
+    }
+    Object.keys(changes).forEach(function(path){ queueWrite(path, changes[path]); });
+    savedViewState = cloneData(state);
+    scheduleSaveState();
   }
 
-  // 탭을 벗어나거나 창을 닫기 직전에는 대기 중인 저장을 바로 반영
+  // 비동기 저장은 페이지 종료 시 완료를 보장하지 않으므로, 미저장 변경은 사용자에게 알린다.
   document.addEventListener("visibilitychange", function(){
     if(document.hidden && saveDebounceTimer){ flushSaveState(); }
   });
-  window.addEventListener("beforeunload", function(){
-    if(saveDebounceTimer){ flushSaveState(); }
+  window.addEventListener("beforeunload", function(e){
+    if(saveDebounceTimer || saveInFlight || Object.keys(pendingWrites).length){
+      flushSaveState();
+      e.preventDefault();
+      e.returnValue = "";
+    }
   });
 
 
@@ -2275,6 +2395,8 @@
   });
 
   function openMemberModal(id){
+    if(!isAdminUser()) return;
+    if(!phonesLoaded){ alert("연락처를 불러오는 중입니다. 잠시 후 다시 시도해주세요."); return; }
     var m = id ? state.members.find(function(x){ return x.id === id; }) : null;
     document.getElementById("memberModalTitle").textContent = m ? "단원 수정" : "단원 추가";
     document.getElementById("memberId").value = m ? m.id : "";
@@ -2305,6 +2427,10 @@
 
   document.getElementById("memberForm").addEventListener("submit", function(e){
     e.preventDefault();
+    if(!isAdminUser() || !phonesLoaded){
+      alert("연락처를 불러온 후 저장할 수 있습니다.");
+      return;
+    }
     var id = document.getElementById("memberId").value;
     var partSel = document.getElementById("memberPart").value;
     var partVal = partSel === "__custom__"
@@ -2963,6 +3089,7 @@
   });
 
   document.getElementById("attendListPage").addEventListener("click", function(e){
+    if(!isAdminUser()) return;
     var btn = e.target.closest(".attend-btn");
     if(!btn || !currentAttendId) return;
     var r = state.rehearsals.find(function(x){ return x.id === currentAttendId; });
@@ -3385,7 +3512,7 @@
   /* ============================================================
      구글 로그인 (Firebase Authentication)
      - 조회(읽기)는 누구나 가능
-     - 구글 계정으로 로그인한 사람(단원 포함 누구나)은 연락처를 볼 수 있음
+     - 현재 Database Rules에서는 Firebase 로그인 계정이 연락처를 읽을 수 있음
      - 등록/수정/삭제(쓰기)는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
   ============================================================ */
   function setAdminState(isAdmin, user){
@@ -3454,8 +3581,8 @@
 
   document.getElementById("adminLoginBtn").addEventListener("click", function(){ doGoogleLogin(this); });
 
-  // 단원 로그인: 구글 계정이 아니라, 운영자가 Firebase 콘솔에서 미리 만들어준
-  // 이메일/비밀번호 계정으로만 로그인 (누구나 아무 구글 계정으로 들어오는 것을 막기 위함)
+  // 단원 로그인: 운영자가 만든 이메일/비밀번호 계정도 사용할 수 있다.
+  // 연락처 열람은 현재 Database Rules에서 Firebase 로그인 여부로 결정한다.
   document.getElementById("memberLoginToggleBtn").addEventListener("click", function(){
     var form = document.getElementById("memberLoginForm");
     var open = form.style.display !== "none";
@@ -3492,12 +3619,16 @@
       .finally(function(){ submitBtn.disabled = false; });
   });
 
-  document.getElementById("adminLogoutBtn").addEventListener("click", function(){
+  function logoutWhenSaved(){
+    if(saveDebounceTimer || saveInFlight || Object.keys(pendingWrites).length){
+      flushSaveState();
+      alert("저장이 완료된 뒤 로그아웃해주세요.");
+      return;
+    }
     if(auth) auth.signOut();
-  });
-  document.getElementById("memberLogoutBtn").addEventListener("click", function(){
-    if(auth) auth.signOut();
-  });
+  }
+  document.getElementById("adminLogoutBtn").addEventListener("click", logoutWhenSaved);
+  document.getElementById("memberLogoutBtn").addEventListener("click", logoutWhenSaved);
 
   /* ============================================================
      홈화면 추가 (PWA 설치)
