@@ -871,7 +871,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.25-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.27-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -883,9 +883,13 @@
     </div>
     <div id="adminLoggedIn" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;">
       <span id="adminEmailLabel" style="font-size:12px;color:var(--ink-soft);"></span>
-      <button class="btn-secondary" id="firebaseSettingsBtn" type="button" style="font-size:12px;padding:7px 12px;">⚙ DB 설정</button>
-      <button class="btn-secondary" id="exportBtn" type="button" style="font-size:12px;padding:7px 12px;">⬇ 내보내기</button>
-      <button class="btn-secondary" id="importBtn" type="button" style="font-size:12px;padding:7px 12px;">⬆ 가져오기</button>
+      <details style="font-size:12px;color:var(--ink-soft);text-align:left;">
+        <summary style="cursor:pointer;">백업·복구</summary>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <button class="btn-secondary" id="exportBtn" type="button" style="font-size:12px;padding:7px 12px;">⬇ 백업 다운로드</button>
+          <button class="btn-secondary" id="importBtn" type="button" style="font-size:12px;padding:7px 12px;">⬆ 백업 복원</button>
+        </div>
+      </details>
       <button class="btn-secondary" id="adminLogoutBtn" type="button" style="font-size:12px;padding:7px 12px;">로그아웃</button>
     </div>
     <div id="adminLoginError" style="display:none;width:100%;text-align:center;font-size:11.5px;color:var(--danger);margin-top:4px;"></div>
@@ -1176,43 +1180,6 @@
   </div>
 </div>
 
-<!-- ===================== Firebase 설정 모달 ===================== -->
-<div class="modal-overlay" id="firebaseModalOverlay">
-  <div class="modal" style="max-width:560px;">
-    <div class="modal-head">
-      <h2>🔥 Firebase 데이터베이스 설정</h2>
-      <button type="button" class="modal-close" id="firebaseModalClose">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:var(--status-practice-bg);border:1px solid var(--gold-soft);border-radius:10px;padding:14px 16px;font-size:13.5px;line-height:1.7;color:var(--wood-dark);">
-        <strong>처음 설정 방법</strong><br>
-        1. <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase 콘솔</a>에서 새 프로젝트 만들기<br>
-        2. 왼쪽 메뉴 <strong>빌드 → Realtime Database</strong> → 데이터베이스 만들기 (테스트 모드 선택)<br>
-        3. 프로젝트 개요 ⚙ → <strong>앱 추가 → 웹(&lt;/&gt;)</strong> → 앱 등록<br>
-        4. 표시된 <code>firebaseConfig</code> 객체를 복사해서 아래에 붙여넣기
-      </div>
-      <div class="field" style="margin-top:4px;">
-        <label for="fbConfigInput">firebaseConfig (JSON)</label>
-        <textarea id="fbConfigInput" rows="10" style="font-family:monospace;font-size:12.5px;" placeholder='{
-  "apiKey": "AIza...",
-  "authDomain": "your-project.firebaseapp.com",
-  "databaseURL": "https://your-project-default-rtdb.firebaseio.com",
-  "projectId": "your-project",
-  "storageBucket": "your-project.appspot.com",
-  "messagingSenderId": "000000000000",
-  "appId": "1:000:web:000"
-}'></textarea>
-      </div>
-      <p id="fbConfigError" style="color:var(--danger);font-size:13px;display:none;"></p>
-    </div>
-    <div class="modal-foot">
-      <button type="button" class="btn-secondary" id="firebaseModalClose2">취소</button>
-      <button type="button" class="btn-primary" id="fbConnectBtn">🔗 연결</button>
-    </div>
-  </div>
-</div>
-
-
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -1223,7 +1190,6 @@
   /* ============================================================
      데이터 저장소
   ============================================================ */
-  var FB_CONFIG_KEY = "gyoha_firebase_config_v1";
   var DB_PATH = "gyoha-guitar";
   var PHONES_PATH = "gyoha-guitar-phones"; // gyoha-guitar와 형제(최상위) 경로 — 부모 노드에 종속되면 안 됨
   var db = null;
@@ -1541,7 +1507,7 @@
       auth.onAuthStateChanged(function(user){
         // 연락처 열람 권한은 관리자 여부와 무관하게 "구글 인증 여부"만 따른다 (DB 규칙과 동일한 기준)
         attachPhonesListener(!!user);
-        // 쓰기·설정 권한은 ADMIN_EMAILS에 등록된 계정만. 그 외 구글 계정은 로그아웃시키지 않고
+        // 쓰기 권한은 ADMIN_EMAILS에 등록된 계정만. 그 외 구글 계정은 로그아웃시키지 않고
         // "단원" 상태로 유지해 연락처만 볼 수 있게 한다 (실제 쓰기 차단은 Database 규칙이 담당).
         var isAdmin = !!(user && ADMIN_EMAILS.indexOf((user.email||"").toLowerCase()) !== -1);
         setAdminState(isAdmin, user);
@@ -1597,11 +1563,7 @@
         if(!rendered){ rendered = true; renderAll(); }
       }, 5000);
 
-      localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(config));
-      closeModal("firebaseModalOverlay");
     }catch(err){
-      var errEl = document.getElementById("fbConfigError");
-      if(errEl){ errEl.textContent = "오류: " + err.message; errEl.style.display = "block"; }
       console.error("Firebase 초기화 오류:", err);
     }
   }
@@ -1617,8 +1579,8 @@
   }
 
   function loadState(){
-    // 항상 코드에 내장된 기본 설정으로 연결 (localStorage 무시)
-    localStorage.removeItem(FB_CONFIG_KEY);
+    // 이전 수동 설정 값은 사용하지 않고 기본 설정으로 연결한다.
+    localStorage.removeItem("gyoha_firebase_config_v1");
     initFirebase(DEFAULT_FB_CONFIG);
   }
 
@@ -3389,6 +3351,10 @@
      내보내기 / 가져오기 / 샘플 데이터 삭제
   ============================================================ */
   document.getElementById("exportBtn").addEventListener("click", function(){
+    if(!dataLoaded || !phonesLoaded){
+      alert("자료와 연락처를 모두 불러온 뒤 백업할 수 있습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
     var blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -3401,6 +3367,10 @@
   });
 
   document.getElementById("importBtn").addEventListener("click", function(){
+    if(!dataLoaded || !phonesLoaded){
+      alert("자료와 연락처를 모두 불러온 뒤 복원할 수 있습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
     document.getElementById("importFile").click();
   });
   document.getElementById("importFile").addEventListener("change", function(e){
@@ -3462,21 +3432,6 @@
     refreshPartSuggestions();
   }
 
-  /* ============================================================
-     Firebase 설정 모달 이벤트
-  ============================================================ */
-  function openFirebaseModal(){
-    var raw = localStorage.getItem(FB_CONFIG_KEY);
-    if(raw){
-      try{
-        var cfg = JSON.parse(raw);
-        document.getElementById("fbConfigInput").value = JSON.stringify(cfg, null, 2);
-      }catch(e){}
-    }
-    var errEl = document.getElementById("fbConfigError");
-    if(errEl){ errEl.style.display = "none"; }
-    openModal("firebaseModalOverlay");
-  }
   document.getElementById("adminToggleBtn").addEventListener("click", function(){
     var panel = document.getElementById("adminPanel");
     var open = panel.style.display === "flex";
@@ -3488,7 +3443,7 @@
      구글 로그인 (Firebase Authentication)
      - 조회(읽기)는 누구나 가능
      - 구글 계정으로 로그인한 사람(단원 포함 누구나)은 연락처를 볼 수 있음
-     - 등록/수정/삭제(쓰기)와 DB 설정/내보내기/가져오기는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
+     - 등록/수정/삭제(쓰기)와 백업·복구는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
   ============================================================ */
   function setAdminState(isAdmin, user){
     document.body.classList.toggle("is-admin", isAdmin);
@@ -3599,58 +3554,6 @@
   });
   document.getElementById("memberLogoutBtn").addEventListener("click", function(){
     if(auth) auth.signOut();
-  });
-
-  document.getElementById("firebaseSettingsBtn").addEventListener("click", openFirebaseModal);
-
-  function closeFirebaseModal(){
-    if(db) closeModal("firebaseModalOverlay");
-    // DB 미연결 상태에서는 닫기 불가 (설정 필수)
-  }
-  document.getElementById("firebaseModalClose").addEventListener("click", closeFirebaseModal);
-  document.getElementById("firebaseModalClose2").addEventListener("click", closeFirebaseModal);
-
-  document.getElementById("fbConnectBtn").addEventListener("click", function(){
-    var errEl = document.getElementById("fbConfigError");
-    errEl.style.display = "none";
-
-    // Firebase SDK 로드 확인
-    if(typeof firebase === "undefined"){
-      errEl.textContent = "Firebase SDK 로드 실패. 인터넷 연결 확인 후 페이지를 새로고침 해주세요.";
-      errEl.style.display = "block";
-      return;
-    }
-
-    var raw = document.getElementById("fbConfigInput").value.trim();
-    if(!raw){ errEl.textContent = "설정 값을 입력해주세요."; errEl.style.display = "block"; return; }
-
-    var cfg;
-    try{
-      var jsonStr = raw.replace(/^[\s\S]*?(\{[\s\S]*\})[\s\S]*$/, "$1");
-      cfg = JSON.parse(jsonStr);
-    }catch(e){
-      errEl.textContent = "JSON 형식이 올바르지 않습니다. { } 블록만 붙여넣어 주세요.";
-      errEl.style.display = "block";
-      return;
-    }
-    if(!cfg.databaseURL){
-      errEl.textContent = "databaseURL이 없습니다. Realtime Database URL을 확인해주세요.";
-      errEl.style.display = "block";
-      return;
-    }
-
-    try{
-      if(firebase.apps.length){
-        firebase.app().delete().then(function(){ db = null; initFirebase(cfg); }).catch(function(e){
-          errEl.textContent = "오류: " + e.message; errEl.style.display = "block";
-        });
-      } else {
-        initFirebase(cfg);
-      }
-    }catch(e){
-      errEl.textContent = "오류: " + e.message;
-      errEl.style.display = "block";
-    }
   });
 
   /* ============================================================
