@@ -588,7 +588,6 @@
     </div>
     <div class="header-actions">
       <span id="saveIndicator" class="conn-badge" style="display:none;"></span>
-      <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </div>
   <div class="staff"></div>
@@ -871,7 +870,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.27-1</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.27-2</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -883,13 +882,6 @@
     </div>
     <div id="adminLoggedIn" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;">
       <span id="adminEmailLabel" style="font-size:12px;color:var(--ink-soft);"></span>
-      <details style="font-size:12px;color:var(--ink-soft);text-align:left;">
-        <summary style="cursor:pointer;">백업·복구</summary>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
-          <button class="btn-secondary" id="exportBtn" type="button" style="font-size:12px;padding:7px 12px;">⬇ 백업 다운로드</button>
-          <button class="btn-secondary" id="importBtn" type="button" style="font-size:12px;padding:7px 12px;">⬆ 백업 복원</button>
-        </div>
-      </details>
       <button class="btn-secondary" id="adminLogoutBtn" type="button" style="font-size:12px;padding:7px 12px;">로그아웃</button>
     </div>
     <div id="adminLoginError" style="display:none;width:100%;text-align:center;font-size:11.5px;color:var(--danger);margin-top:4px;"></div>
@@ -3348,57 +3340,8 @@
   }
 
   /* ============================================================
-     내보내기 / 가져오기 / 샘플 데이터 삭제
+     샘플 데이터 삭제
   ============================================================ */
-  document.getElementById("exportBtn").addEventListener("click", function(){
-    if(!dataLoaded || !phonesLoaded){
-      alert("자료와 연락처를 모두 불러온 뒤 백업할 수 있습니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-    var blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "교하성당_클래식기타반_악보관리_" + todayISO() + ".json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("importBtn").addEventListener("click", function(){
-    if(!dataLoaded || !phonesLoaded){
-      alert("자료와 연락처를 모두 불러온 뒤 복원할 수 있습니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-    document.getElementById("importFile").click();
-  });
-  document.getElementById("importFile").addEventListener("change", function(e){
-    var file = e.target.files[0];
-    if(!file) return;
-    var reader = new FileReader();
-    reader.onload = function(){
-      try{
-        var parsed = JSON.parse(reader.result);
-        if(!parsed || !Array.isArray(parsed.scores)) throw new Error("형식이 올바르지 않습니다.");
-        if(!confirm("가져온 파일로 현재 데이터를 덮어씁니다. 계속할까요?")) return;
-        state.scores = parsed.scores || [];
-        state.members = parsed.members || [];
-        state.rehearsals = parsed.rehearsals || [];
-        state.monthlyRecitals = parsed.monthlyRecitals || [];
-        state.sample = false;
-        migrateData();
-        saveState();
-        renderAll();
-        alert("데이터를 불러왔습니다.");
-      }catch(err){
-        alert("파일을 읽지 못했습니다. 올바른 백업(JSON) 파일인지 확인해주세요.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  });
-
   document.getElementById("clearSampleBtn").addEventListener("click", function(){
     askDelete("예시로 등록된 악보·단원·연습 일정을 모두 삭제합니다.", function(){
       state.scores = state.scores.filter(function(s){ return !s.sample; });
@@ -3443,7 +3386,7 @@
      구글 로그인 (Firebase Authentication)
      - 조회(읽기)는 누구나 가능
      - 구글 계정으로 로그인한 사람(단원 포함 누구나)은 연락처를 볼 수 있음
-     - 등록/수정/삭제(쓰기)와 백업·복구는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
+     - 등록/수정/삭제(쓰기)는 ADMIN_EMAILS에 등록된 운영자 계정만 가능
   ============================================================ */
   function setAdminState(isAdmin, user){
     document.body.classList.toggle("is-admin", isAdmin);
