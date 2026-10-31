@@ -684,14 +684,13 @@
     <p style="font-size:13.5px; color:var(--ink-soft); margin:-8px 0 16px;">
       곡마다 어느 파트를 누가 연주할지 정해보세요. 변경 사항은 바로 저장됩니다.
     </p>
-    <input class="search-input" id="partAssignSearch" type="search" aria-label="파트 배정 악보 찾기" placeholder="악보 제목, 작곡가로 검색…" style="margin-bottom:16px;">
+    <select class="search-input" id="partAssignSearch" aria-label="파트 배정 악보 선택" style="margin-bottom:16px;"><option value="">전체 악보 보기</option></select>
     <div id="partAssignList" class="assign-grid"></div>
     <div id="partAssignEmpty" class="empty-state" style="display:none;">
       <span class="glyph">🎻</span>
       <p><strong>등록된 악보가 없습니다.</strong></p>
       <p>먼저 악보함에서 곡과 파트를 추가해주세요.</p>
     </div>
-    <div id="partAssignNoResults" class="empty-state" style="display:none;" role="status"><p>검색 결과가 없습니다.</p></div>
   </section>
 
   <!-- ===================== 단원 ===================== -->
@@ -874,7 +873,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.31-2</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.31-3</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2522,16 +2521,18 @@
   function renderPartAssign(){
     var box = document.getElementById("partAssignList");
     var empty = document.getElementById("partAssignEmpty");
-    var noResults = document.getElementById("partAssignNoResults");
-    var query = document.getElementById("partAssignSearch").value.trim().toLocaleLowerCase();
-
-    var eligible = state.scores.filter(function(s){ return isEnsembleType(s.type); });
-    var list = eligible.filter(function(s){
-      return !query || (s.title || "").toLocaleLowerCase().includes(query) || (s.composer || "").toLocaleLowerCase().includes(query);
-    }).sort(function(a,b){ return (a.title||"").localeCompare(b.title||"","ko"); });
+    var select = document.getElementById("partAssignSearch");
+    var selected = select.value;
+    var eligible = state.scores.filter(function(s){ return isEnsembleType(s.type); })
+      .sort(function(a,b){ return (a.title||"").localeCompare(b.title||"","ko"); });
+    select.replaceChildren(new Option("전체 악보 보기", ""));
+    eligible.forEach(function(s){
+      select.add(new Option((s.title || "제목 없음") + (s.composer ? " · " + s.composer : ""), s.id));
+    });
+    select.value = eligible.some(function(s){ return s.id === selected; }) ? selected : "";
+    var list = select.value ? eligible.filter(function(s){ return s.id === select.value; }) : eligible;
     document.getElementById("assignCount").textContent = "(" + list.length + ")";
     empty.style.display = eligible.length ? "none" : "block";
-    noResults.style.display = eligible.length && !list.length ? "block" : "none";
 
     if(!list.length){
       box.innerHTML = "";
@@ -2550,7 +2551,7 @@
     }).join("");
   }
 
-  document.getElementById("partAssignSearch").addEventListener("input", renderPartAssign);
+  document.getElementById("partAssignSearch").addEventListener("change", renderPartAssign);
   document.getElementById("partAssignList").addEventListener("change", function(e){
     if(e.target.type !== "checkbox") return;
     var scoreId = e.target.dataset.score;
