@@ -873,7 +873,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.10.31-3</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.05-1</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2011,8 +2011,15 @@
       return '<span class="part-pill'+(memberNames.length?' linked':'')+'">'+label+'</span>';
     }).join("");
 
-    var scoreLinkHtml = s.scoreLink
-      ? '<a href="'+escapeHtml(s.scoreLink)+'" target="_blank" rel="noopener" class="btn-text" style="padding:0;">총보 보기 ↗</a>'
+    var scoreUrl = s.scoreLink || "";
+    try {
+      var parsedScoreUrl = new URL(scoreUrl);
+      if(parsedScoreUrl.origin === "https://khmass-liturgy.github.io" && parsedScoreUrl.pathname === "/c-repo/" && parsedScoreUrl.searchParams.has("scorePath")){
+        scoreUrl = "https://itsrhbpjtiscnhndbkkf.supabase.co/functions/v1/shared-score?id=" + encodeURIComponent(s.id);
+      }
+    } catch (_) {}
+    var scoreLinkHtml = scoreUrl
+      ? '<a href="'+escapeHtml(scoreUrl)+'" target="_blank" rel="noopener" class="btn-text" style="padding:0;">총보 보기 ↗</a>'
       : '';
 
     var typeBadge = (s.type === "독주")
