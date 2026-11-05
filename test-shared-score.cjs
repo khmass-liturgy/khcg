@@ -32,5 +32,17 @@ vm.runInNewContext(source, sandbox);
   link = 'https://khmass-liturgy.github.io/c-repo/?scorePath=' + encodeURIComponent('private/secrets.pdf');
   result = await handler({ method: 'GET', url: 'https://example.test/?id=score123' });
   assert.strictEqual(result.status, 404);
+  calls = [];
+  result = await handler({ method: 'GET', url: 'https://example.test/?share=e7daefe0-758a-4415-bd1b-8d268dcad8e3' });
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(await result.text(), '%PDF-1.4');
+  assert.strictEqual(calls.length, 1);
+  assert(calls[0].endsWith('/306fd552-b8e9-4225-b89f-234668d9a8b5/library/e7daefe0-758a-4415-bd1b-8d268dcad8e3/score.pdf'));
+  calls = [];
+  for (const share of ['unapproved', '__proto__', 'constructor']) {
+    result = await handler({ method: 'GET', url: 'https://example.test/?share=' + share });
+    assert.strictEqual(result.status, 404);
+  }
+  assert.strictEqual(calls.length, 0);
   console.log('KHCG_SHARED_SCORE_TEST_OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });
