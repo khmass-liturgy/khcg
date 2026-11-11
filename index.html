@@ -882,7 +882,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-4</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-5</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2730,14 +2730,14 @@
   var kakaoSdkLoad;
 
   function loadKakaoSdk(){
-    if(window.Kakao && window.Kakao.Share) return Promise.resolve(window.Kakao);
+    if(window.Kakao && typeof window.Kakao.init === "function") return Promise.resolve(window.Kakao);
     if(!kakaoSdkLoad){
       kakaoSdkLoad = new Promise(function(resolve, reject){
         var script = document.createElement("script");
         script.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
         script.async = true;
         script.onload = function(){
-          if(window.Kakao && window.Kakao.Share) resolve(window.Kakao);
+          if(window.Kakao && typeof window.Kakao.init === "function") resolve(window.Kakao);
           else reject(new Error("카카오 공유 모듈을 찾을 수 없습니다."));
         };
         script.onerror = function(){ reject(new Error("카카오 SDK에 연결할 수 없습니다.")); };
