@@ -883,7 +883,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-7</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-8</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2756,14 +2756,19 @@
     var rehearsal = state.rehearsals.find(function(r){ return r.id === id; });
     if(!rehearsal) return "";
     var lines = [
-      "교하성당 클래식기타반 연습(수업) 일정",
-      formatDateFull(rehearsal.date) + (rehearsal.time ? " " + rehearsal.time : ""),
-      rehearsal.cancelled ? "휴강" + (rehearsal.cancelReason ? " · " + rehearsal.cancelReason : "") : rehearsal.location || "장소 미정"
+      "🎸 교하성당 클래식기타반",
+      "연습 · 수업 안내",
+      "",
+      "🗓 " + formatDateFull(rehearsal.date) + (rehearsal.time ? "  " + rehearsal.time : ""),
+      "📍 " + (rehearsal.location || "장소 미정")
     ];
-    if(!rehearsal.cancelled){
-      lines = lines.concat(pieceTitlesByIds(rehearsal.pieceIds), customNoticeItems(rehearsal));
+    if(rehearsal.cancelled){
+      lines.push("", "휴강 안내", rehearsal.cancelReason || "이번 수업은 휴강입니다.");
+    } else {
+      var items = pieceTitlesByIds(rehearsal.pieceIds).concat(customNoticeItems(rehearsal));
+      if(items.length) lines = lines.concat(["", "♫ 연습곡 · 공지"], items.map(function(item){ return "• " + item; }));
     }
-    if(rehearsal.memo) lines.push(rehearsal.memo);
+    if(rehearsal.memo) lines.push("", "📝 안내사항", rehearsal.memo);
     return lines.join("\n");
   }
 
@@ -2772,7 +2777,7 @@
     var message = selectedRehearsalMessage();
     if(!message) return;
     try {
-      await navigator.clipboard.writeText(message + "\n" + rehearsalShareUrl);
+      await navigator.clipboard.writeText(message + "\n\n전체 일정 보기\n" + rehearsalShareUrl);
       rehearsalShareStatus.textContent = "일정을 복사했습니다. 카카오톡 채팅방에 붙여넣으세요.";
     } catch(error) {
       rehearsalShareStatus.textContent = "일정을 복사하지 못했습니다.";
