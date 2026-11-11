@@ -883,7 +883,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-11</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-12</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2696,6 +2696,25 @@
     '</div>';
   }
 
+  var linkedRehearsalOpened = false;
+
+  function openLinkedRehearsal(){
+    var id = new URLSearchParams(window.location.search).get("rehearsal");
+    if(!id || linkedRehearsalOpened) return;
+    document.querySelector('.tab-btn[data-tab="rehearsals"]').click();
+    var card = Array.from(document.querySelectorAll("#rehearsalList .rehearsal-card"))
+      .find(function(element){ return element.dataset.id === id; });
+    if(!card) return;
+    linkedRehearsalOpened = true;
+    document.getElementById("rehearsalShareDate").value = id;
+    card.style.outline = "3px solid var(--gold)";
+    card.setAttribute("tabindex", "-1");
+    requestAnimationFrame(function(){
+      card.scrollIntoView({ block: "center" });
+      card.focus({ preventScroll: true });
+    });
+  }
+
   function renderRehearsals(){
     renderNextRehearsal();
     var today = todayISO();
@@ -2724,9 +2743,15 @@
       empty.style.display = "none";
       box.innerHTML = list.map(rehearsalCardHtml).join("");
     }
+    openLinkedRehearsal();
   }
 
   var rehearsalShareUrl = "https://khmass-liturgy.github.io/khcg/";
+  function selectedRehearsalUrl(){
+    var url = new URL(rehearsalShareUrl);
+    url.searchParams.set("rehearsal", document.getElementById("rehearsalShareDate").value);
+    return url.href;
+  }
   var rehearsalShareStatus = document.getElementById("rehearsalShareStatus");
   var kakaoSdkLoad;
 
@@ -2777,7 +2802,7 @@
     var message = selectedRehearsalMessage();
     if(!message) return;
     try {
-      await navigator.clipboard.writeText(message + "\n\n전체 일정 보기\n" + rehearsalShareUrl);
+      await navigator.clipboard.writeText(message + "\n\n일정 보기\n" + selectedRehearsalUrl());
       rehearsalShareStatus.textContent = "일정을 복사했습니다. 카카오톡 채팅방에 붙여넣으세요.";
     } catch(error) {
       rehearsalShareStatus.textContent = "일정을 복사하지 못했습니다.";
@@ -2789,6 +2814,7 @@
     var message = selectedRehearsalMessage();
     if(!message) return;
     var button = this;
+    var shareUrl = selectedRehearsalUrl();
     button.disabled = true;
     rehearsalShareStatus.textContent = "";
     var kakao;
@@ -2799,7 +2825,7 @@
       await kakao.Share.sendDefault({
         objectType: "text",
         text: message,
-        link: { mobileWebUrl: rehearsalShareUrl, webUrl: rehearsalShareUrl },
+        link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
         buttonTitle: "일정 보기"
       });
     } catch(error) {
