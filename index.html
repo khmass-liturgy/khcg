@@ -165,6 +165,7 @@
   /* ---------- 운영자 로그인 전에는 수정/삭제/추가 UI 숨김 ----------
      아래는 UX용이며 실제 쓰기 권한은 Firebase Database Rules에서 운영자 계정으로 제한해야 함 */
   body:not(.is-admin) #addScoreBtn,
+  body:not(.is-admin) #rehearsalShare,
   body:not(.is-admin) #addMemberBtn,
   body:not(.is-admin) #addRehearsalBtn,
   body:not(.is-admin) #bulkRehearsalBtn,
@@ -717,7 +718,7 @@
       </div>
     </div>
     <div id="nextRehearsal"></div>
-    <div id="rehearsalShare" hidden style="margin-bottom:16px;">
+    <div id="rehearsalShare" class="admin-only" hidden style="margin-bottom:16px;">
       <label for="rehearsalShareDate">공유할 연습 일정</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
         <select id="rehearsalShareDate"></select>
@@ -882,7 +883,7 @@
 </div>
 
 <footer class="app-footer">
-  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-5</span>
+  교하성당 클래식기타반 합주 악보 관리 · <span style="color:var(--gold);font-weight:600;">v2026.11.11-6</span>
   <br>
   <button id="adminToggleBtn" type="button" style="background:none;border:none;color:var(--ink-faint);font-size:11px;cursor:pointer;margin-top:8px;opacity:0.45;text-decoration:underline;text-underline-offset:2px;">운영자 메뉴</button>
   <div id="adminPanel" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px;justify-content:center;">
@@ -2762,6 +2763,7 @@
   }
 
   document.getElementById("rehearsalCopyBtn").addEventListener("click", async function(){
+    if(!isAdminUser()) return;
     var message = selectedRehearsalMessage();
     if(!message) return;
     try {
@@ -2773,6 +2775,7 @@
   });
 
   document.getElementById("rehearsalShareBtn").addEventListener("click", async function(){
+    if(!isAdminUser()) return;
     var message = selectedRehearsalMessage();
     if(!message) return;
     var button = this;
@@ -2781,6 +2784,7 @@
     var kakao;
     try {
       kakao = await loadKakaoSdk();
+      if(!isAdminUser()) return;
       if(!kakao.isInitialized()) kakao.init("671da3fb68e72269f3c3dbadabdf8c0f");
       await kakao.Share.sendDefault({
         objectType: "text",
